@@ -101,7 +101,7 @@ cd Flowtrades/btc-orderflow
 python main.py
 ```
 
-Open your browser and go to `http://localhost:8000`
+Open your browser and go to `http://localhost:5173`
 
 > ⚠️ **Note:** This project is actively being built. Expect rough edges. If something breaks, open an issue.
 
