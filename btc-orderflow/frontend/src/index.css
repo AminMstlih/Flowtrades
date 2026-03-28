@@ -1,0 +1,1005 @@
+:root {
+  --bg-dark: #0a0b0d;
+  --bg-panel: #131722;
+  --text-primary: #d1d4dc;
+  --text-secondary: #787b86;
+  --buy-green: #00e676;
+  --sell-red: #ff1744;
+  --accent-orange: #ff9800;
+  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+  --cell-h: 24px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── VIEWPORT LAYOUT ────────────────────────────────── */
+
+.main-viewport-wrapper {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-dark);
+}
+
+.chart-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.price-axis-sidebar {
+  width: 100px;
+  /* Wider for precision */
+  background-color: var(--bg-panel);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 20;
+  user-select: none;
+}
+
+/* ── PRICE SCALE SIDEBAR ────────────────────────────── */
+
+.price-scale-sidebar {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  cursor: ns-resize;
+}
+
+.price-scale-container {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.price-tick {
+  height: var(--cell-h);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.price-tick-active {
+  color: white;
+  font-weight: 900;
+}
+
+.live-price-label {
+  position: absolute;
+  right: 0;
+  background: var(--accent-orange);
+  color: black;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  transform: translateY(-50%);
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: -4px 0 15px rgba(255, 152, 0, 0.5);
+  transition: top 0.1s linear;
+  /* Smooth tracking */
+}
+
+/* ── FOOTPRINT CHART GRID ───────────────────────────── */
+
+.footprint-chart {
+  width: max-content;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  table-layout: fixed;
+  /* Crucial for sync */
+}
+
+.footprint-chart th {
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  height: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.exo-cell {
+  position: relative;
+  padding: 0 !important;
+  width: 140px;
+  height: var(--cell-h);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.exo-splits {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 0.6rem;
+  position: relative;
+  z-index: 2;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.vol-left {
+  color: rgba(255, 255, 255, 0.45);
+  text-align: left;
+}
+
+.vol-right {
+  color: rgba(255, 255, 255, 0.45);
+  text-align: right;
+}
+
+.ohlc-line-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 100%;
+  z-index: 4;
+  transform: translateX(-50%);
+  pointer-events: none;
+  /* CRITICAL: Ensure lines are visible */
+  display: block;
+  min-width: 1px;
+}
+
+.ohlc-body-up {
+  width: 5px;
+  background-color: var(--buy-green);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
+  border-radius: 2px;
+  /* CRITICAL: Ensure visibility */
+  opacity: 1;
+  border: 1px solid rgba(0, 230, 118, 0.8);
+}
+
+.ohlc-body-down {
+  width: 5px;
+  background-color: var(--sell-red);
+  box-shadow: 0 0 8px rgba(255, 23, 68, 0.6);
+  border-radius: 2px;
+  /* CRITICAL: Ensure visibility */
+  opacity: 1;
+  border: 1px solid rgba(255, 23, 68, 0.8);
+}
+
+.ohlc-wick-up {
+  width: 1px;
+  background-color: var(--buy-green);
+  opacity: 0.8;
+  border-radius: 1px;
+  /* CRITICAL: Ensure visibility */
+  border-left: 1px solid rgba(0, 230, 118, 0.6);
+}
+
+.ohlc-wick-down {
+  width: 1px;
+  background-color: var(--sell-red);
+  opacity: 0.8;
+  border-radius: 1px;
+  /* CRITICAL: Ensure visibility */
+  border-left: 1px solid rgba(255, 23, 68, 0.6);
+}
+
+.poc-cell {
+  background-color: rgba(255, 213, 79, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 213, 79, 0.5);
+}
+
+.imb-sell {
+  color: var(--sell-red) !important;
+  font-weight: 900;
+}
+
+.imb-buy {
+  color: var(--buy-green) !important;
+  font-weight: 900;
+}
+
+.live-cell-blink {
+  animation: cell-pulse 1s infinite alternate;
+}
+
+@keyframes cell-pulse {
+  from {
+    box-shadow: inset 0 0 0 0px var(--accent-orange);
+  }
+
+  to {
+    box-shadow: inset 0 0 12px 1px rgba(255, 152, 0, 0.25);
+  }
+}
+
+.pan-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #888;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── HEADER / NAV BAR ────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 20px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-orange);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.exchange-list {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.live-price {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.control-group label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.control-group select {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.control-group select:hover {
+  border-color: var(--accent-orange);
+}
+
+.control-group select:focus {
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.3);
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.status-badge.connected {
+  color: var(--buy-green);
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.status-badge.disconnected {
+  color: var(--sell-red);
+  background: rgba(255, 23, 68, 0.1);
+  border: 1px solid rgba(255, 23, 68, 0.3);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s infinite;
+}
+
+.status-badge.connected .status-dot {
+  background: var(--buy-green);
+  box-shadow: 0 0 6px var(--buy-green);
+}
+
+.status-badge.disconnected .status-dot {
+  background: var(--sell-red);
+  box-shadow: 0 0 6px var(--sell-red);
+}
+
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.stats-row {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.stats-row .stat-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── PRICE SCALE DRAG INDICATOR ──────────────────────── */
+
+.price-scale-sidebar {
+  cursor: ns-resize;
+  transition: background-color 0.15s;
+}
+
+.price-scale-sidebar:hover {
+  background-color: rgba(255, 152, 0, 0.03);
+}
+
+.price-scale-sidebar:active {
+  background-color: rgba(255, 152, 0, 0.06);
+}
+
+.price-scale-sidebar::before {
+  content: '⇕ Drag to resize tick';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: rgba(255, 152, 0, 0.4);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.price-scale-sidebar:hover::before {
+  opacity: 1;
+}
+
+/* ── INDICATOR ROWS (TradingView Style Bottom) ───────── */
+
+.indicator-row {
+  height: 36px;
+}
+
+.indicator-cell {
+  position: relative;
+  padding: 0 !important;
+  width: 140px;
+  height: 36px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: bottom;
+}
+
+/* Volume Bar */
+.vol-bar-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 8px;
+  /* CRITICAL: Ensure container is visible */
+  position: relative;
+}
+
+.vol-bar {
+  width: 60%;
+  min-height: 2px;
+  border-radius: 1px 1px 0 0;
+  transition: height 0.15s ease;
+  /* CRITICAL: Ensure bars are visible */
+  display: block;
+  position: relative;
+}
+
+.vol-bar-up {
+  background: linear-gradient(to top, rgba(0, 230, 118, 0.8), rgba(0, 230, 118, 0.4));
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.5);
+  /* CRITICAL: Ensure visibility */
+  opacity: 1;
+  border: 1px solid rgba(0, 230, 118, 0.6);
+}
+
+.vol-bar-down {
+  background: linear-gradient(to top, rgba(255, 23, 68, 0.8), rgba(255, 23, 68, 0.4));
+  box-shadow: 0 0 6px rgba(255, 23, 68, 0.5);
+  /* CRITICAL: Ensure visibility */
+  opacity: 1;
+  border: 1px solid rgba(255, 23, 68, 0.6);
+}
+
+/* Delta Bar */
+.delta-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.delta-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+
+.delta-bar-buy {
+  background: linear-gradient(to right, rgba(0, 230, 118, 0.8), rgba(0, 230, 118, 0.4));
+}
+
+.delta-bar-sell {
+  background: linear-gradient(to right, rgba(255, 23, 68, 0.8), rgba(255, 23, 68, 0.4));
+}
+
+.delta-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.delta-label-buy {
+  color: var(--buy-green);
+}
+
+.delta-label-sell {
+  color: var(--sell-red);
+}
+
+/* Time Row */
+.time-row {
+  height: 28px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.time-cell {
+  padding: 0 !important;
+  width: 140px;
+  height: 28px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.time-cell span {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── FIXED BOTTOM PANELS (TradingView Style) ─────────── */
+
+.fixed-bottom-panels {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 100px;
+  /* Leave space for price scale */
+  height: 100px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-dark);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── DELTA PANE ──────────────────────────────────────── */
+
+.delta-pane {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.delta-pane-label {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.delta-pane-content {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  padding-top: 18px;
+}
+
+.delta-pane-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  height: 100%;
+  width: 140px;
+}
+
+.delta-pane-bar-container {
+  width: 100%;
+  height: 50px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.delta-pane-bar {
+  width: 80%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  transition: width 0.15s ease;
+}
+
+.delta-pane-bar-buy {
+  background: linear-gradient(to top, rgba(0, 230, 118, 0.8), rgba(0, 230, 118, 0.3));
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.3);
+}
+
+.delta-pane-bar-sell {
+  background: linear-gradient(to top, rgba(255, 23, 68, 0.8), rgba(255, 23, 68, 0.3));
+  box-shadow: 0 0 6px rgba(255, 23, 68, 0.3);
+}
+
+.delta-pane-value {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 0;
+  text-align: center;
+}
+
+.delta-pane-value-buy {
+  color: var(--buy-green);
+}
+
+.delta-pane-value-sell {
+  color: var(--sell-red);
+}
+
+.delta-pane-time {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  padding-bottom: 2px;
+}
+
+.delta-pane-time-up {
+  color: var(--buy-green);
+  opacity: 0.7;
+}
+
+.delta-pane-time-down {
+  color: var(--sell-red);
+  opacity: 0.7;
+}
+
+/* ── AUTO-FIT INDICATOR ──────────────────────────────── */
+
+.auto-fit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auto-fit-badge.active {
+  color: var(--accent-orange);
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.auto-fit-badge.inactive {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auto-fit-badge:hover {
+  border-color: var(--accent-orange);
+}
+
+/* Adjust chart area to account for fixed bottom panels */
+.main-viewport-wrapper {
+  padding-bottom: 100px;
+}
+
+/* ── CURRENT PRICE HORIZONTAL LINE ──────────────────── */
+
+.current-price-row {
+  position: relative;
+}
+
+.current-price-segment {
+  position: absolute;
+  height: 1px;
+  background: var(--accent-orange);
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.6);
+  pointer-events: none;
+  z-index: 25;
+  transform: translateY(-50%);
+}
+
+/* ── RESPONSIVE DESIGN ──────────────────────────────── */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .header {
+    padding: 0 12px;
+    height: 48px;
+  }
+
+  .title {
+    font-size: 0.85rem;
+  }
+
+  .live-price {
+    font-size: 1.4rem;
+  }
+
+  .price-axis-sidebar {
+    width: 80px;
+  }
+
+  .exo-cell {
+    width: 110px;
+  }
+
+  .indicator-cell {
+    width: 110px;
+  }
+
+  .time-cell {
+    width: 110px;
+  }
+
+  .delta-pane-cell {
+    width: 110px;
+  }
+
+  .fixed-bottom-panels {
+    right: 80px;
+  }
+}
+
+/* Mobile (max-width: 768px) */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .header-left {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .header-center {
+    order: -1;
+  }
+
+  .live-price {
+    font-size: 1.2rem;
+  }
+
+  .header-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .controls-row {
+    gap: 8px;
+  }
+
+  .stats-row {
+    gap: 8px;
+    font-size: 0.6rem;
+  }
+
+  .main-viewport-wrapper {
+    flex-direction: column;
+    padding-bottom: 120px;
+    /* Increased to accommodate price scale */
+  }
+
+  .chart-area {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .price-axis-sidebar {
+    width: 100%;
+    height: 40px;
+    position: fixed;
+    bottom: 120px;
+    /* Positioned above delta pane */
+    left: 0;
+    right: 0;
+    z-index: 30;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-panel);
+  }
+
+  .price-scale-sidebar {
+    cursor: ew-resize;
+    height: 100%;
+  }
+
+  .price-scale-container {
+    display: flex;
+    flex-direction: row;
+    width: max-content;
+    top: 0;
+    height: 100%;
+    transform: translateX(0);
+    /* Reset Y transform for horizontal layout */
+  }
+
+  .price-tick {
+    width: 60px;
+    height: 100% !important;
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+    justify-content: center;
+    padding-right: 0;
+    display: flex;
+    align-items: center;
+    font-size: 0.6rem;
+  }
+
+  .live-price-label {
+    top: 50% !important;
+    left: 0;
+    right: auto;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+  }
+
+  .exo-cell {
+    width: 90px;
+  }
+
+  .indicator-cell {
+    width: 90px;
+  }
+
+  .time-cell {
+    width: 90px;
+  }
+
+  .delta-pane-cell {
+    width: 90px;
+  }
+
+  .fixed-bottom-panels {
+    right: 0;
+    height: 80px;
+  }
+
+  .delta-pane-bar-container {
+    height: 35px;
+  }
+
+  .delta-pane-value {
+    font-size: 0.55rem;
+  }
+
+  .delta-pane-time {
+    font-size: 0.5rem;
+  }
+
+  .auto-fit-badge {
+    font-size: 0.55rem;
+    padding: 2px 6px;
+  }
+
+  .status-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+}
+
+/* Small Mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .title {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  .live-price {
+    font-size: 1rem;
+  }
+
+  .exchange-list {
+    font-size: 0.55rem;
+  }
+
+  .exo-cell {
+    width: 70px;
+  }
+
+  .indicator-cell {
+    width: 70px;
+  }
+
+  .time-cell {
+    width: 70px;
+  }
+
+  .delta-pane-cell {
+    width: 70px;
+  }
+
+  .exo-splits {
+    font-size: 0.6rem;
+    padding: 0 0.3rem;
+  }
+
+  .vol-bar-container {
+    padding: 0 4px;
+  }
+
+  .vol-bar {
+    width: 50%;
+  }
+
+  .fixed-bottom-panels {
+    height: 70px;
+  }
+
+  .delta-pane-bar-container {
+    height: 30px;
+  }
+
+  .delta-pane-value {
+    font-size: 0.5rem;
+  }
+
+  .price-tick {
+    width: 50px;
+  }
+
+  .tick-value {
+    font-size: 0.6rem;
+  }
+}

@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────
+# BTC Order Flow Lite — Configuration
+# All tuneable parameters. Never hardcode in logic.
+# ──────────────────────────────────────────────────
+
+[aggregation]
+# Price granularity per footprint row (USD)
+bucket_size_usd = 1.0
+
+# Available rolling time windows (minutes)
+time_windows_minutes = [1, 5, 15]
+
+# Active window on startup (minutes)
+default_window = 5
+
+[detection]
+# Minimum imbalance % to highlight a bucket
+imbalance_threshold_pct = 70
+
+# Minimum BTC volume to qualify bucket for imbalance display
+min_volume_per_bucket_btc = 0.5
+
+# Volume percentile threshold for absorption flag
+absorption_vol_percentile = 80
+
+# Max price movement % to confirm absorption
+absorption_price_pct = 0.05
+
+[exchanges]
+# Which exchanges to connect to
+enabled = ["binance", "okx", "bybit"]
+
+[display]
+# Number of price levels to display simultaneously
+rows = 20
+
+# Terminal/UI refresh interval (milliseconds)
+refresh_rate_ms = 500
+
+[server]
+host = "0.0.0.0"
+port = 8000
+cors_origins = ["http://localhost:5173", "http://localhost:3000"]
+
+[logging]
+# Log level: DEBUG, INFO, WARNING, ERROR
+level = "INFO"
+
+# Log first N raw payloads on startup for verification
+log_first_n_raw = 100
