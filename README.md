@@ -1,5 +1,8 @@
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/4accfa67-04a7-424e-928d-9574127f7a88" />
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/e1bbe359-7be9-45cc-9012-84626569c08a" />
+<img width="768" height="1676" alt="image" src="https://github.com/user-attachments/assets/4ed187f8-92c2-4141-9e00-1bc6df3e57b6" />
+
+
 
 
 # Flowtrades ⚡
