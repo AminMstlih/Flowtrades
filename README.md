@@ -94,6 +94,10 @@ cd Flowtrades/btc-orderflow
 pip install -r requirements.txt
 
 # Run
+cd Flowtrades/frontend
+npm run dev
+
+cd Flowtrades/btc-orderflow
 python main.py
 ```
 
