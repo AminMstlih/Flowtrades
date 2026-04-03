@@ -2,8 +2,6 @@ import React from 'react';
 import { useChartWebSocket } from './hooks/useChartWebSocket';
 import { Header } from './components/Header';
 import { ChartContainer } from './components/ChartContainer';
-import { FootprintCanvas } from './components/FootprintCanvas';
-import { DeltaCanvas } from './components/DeltaCanvas';
 import { ConnectionOverlay } from './components/ConnectionOverlay';
 
 /**
@@ -17,7 +15,10 @@ import { ConnectionOverlay } from './components/ConnectionOverlay';
  * - CSS Grid layout per Section 2.2
  */
 
-const WS_URL = 'ws://localhost:8000/ws/footprint';
+// Dynamic WS URL: works on localhost AND behind Cloudflare Tunnel (wss)
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_TOKEN = 'flowtrades_dev_token'; // Must match FLOWTRADES_WS_TOKEN on the backend
+const WS_URL = `${protocol}//${window.location.host}/ws/footprint?token=${WS_TOKEN}`;
 
 function App() {
   const { latestDataRef, status } = useChartWebSocket(WS_URL);
@@ -34,21 +35,6 @@ function App() {
       <div className="chart-panel">
         <ChartContainer latestDataRef={latestDataRef} />
         <ConnectionOverlay status={status} />
-      </div>
-
-      {/* Footprint Ladder — Canvas 2D (Section 6) */}
-      <div className="footprint-panel">
-        <div className="footprint-panel__header">
-          <span className="panel-label">ORDER FLOW</span>
-        </div>
-        <div className="footprint-panel__body">
-          <FootprintCanvas latestDataRef={latestDataRef} />
-        </div>
-      </div>
-
-      {/* Delta Indicator — Canvas 2D */}
-      <div className="delta-panel">
-        <DeltaCanvas latestDataRef={latestDataRef} />
       </div>
     </div>
   );

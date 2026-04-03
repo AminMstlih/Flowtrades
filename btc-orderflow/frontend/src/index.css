@@ -55,64 +55,19 @@ html, body {
 
 /* ── APP LAYOUT — CSS Grid (Section 2.2) ─────────────── */
 
-/* Mobile: single column, stacked */
 .app-layout {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   height: 100dvh; /* Section 2.4 — dynamic viewport height */
   overflow: hidden;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr 200px 100px;
-  grid-template-areas:
-    "toolbar"
-    "chart"
-    "footprint"
-    "delta";
-}
-
-/* Tablet: footprint as right panel */
-@media (min-width: 768px) {
-  .app-layout {
-    grid-template-columns: 1fr 280px;
-    grid-template-rows: auto 1fr 100px;
-    grid-template-areas:
-      "toolbar    toolbar"
-      "chart      footprint"
-      "delta      footprint";
-  }
-}
-
-/* Desktop: full layout */
-@media (min-width: 1024px) {
-  .app-layout {
-    grid-template-columns: 1fr 320px;
-    grid-template-rows: 48px 1fr 120px;
-    grid-template-areas:
-      "toolbar    toolbar"
-      "chart      footprint"
-      "delta      footprint";
-  }
-}
-
-/* Wide desktop */
-@media (min-width: 1280px) {
-  .app-layout {
-    grid-template-columns: 1fr 380px;
-  }
-}
-
-/* 4K */
-@media (min-width: 2560px) {
-  .app-layout {
-    grid-template-columns: 1fr 480px;
-  }
 }
 
 /* ── CHART PANEL ─────────────────────────────────────── */
 
 .chart-panel {
-  grid-area: chart;
+  flex: 1;
   position: relative;
   overflow: hidden;
   touch-action: none; /* Section 4.5 — JS handles all touch */
@@ -125,71 +80,9 @@ html, body {
   height: 100%;
 }
 
-/* ── FOOTPRINT PANEL ─────────────────────────────────── */
-
-.footprint-panel {
-  grid-area: footprint;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border-subtle);
-}
-
-.footprint-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 28px;
-  padding: 0 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.panel-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.footprint-panel__body {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Mobile: footprint below chart */
-@media (max-width: 767px) {
-  .footprint-panel {
-    border-left: none;
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-
-/* ── DELTA PANEL ─────────────────────────────────────── */
-
-.delta-panel {
-  grid-area: delta;
-  overflow: hidden;
-  background: var(--bg-primary);
-  border-top: 1px solid var(--border-subtle);
-  position: relative;
-}
-
-@media (min-width: 768px) {
-  .delta-panel {
-    border-right: 1px solid var(--border-subtle);
-  }
-}
-
 /* ── HEADER / TOOLBAR ─────────────────────────────────── */
 
 .header {
-  grid-area: toolbar;
   display: flex;
   align-items: center;
   justify-content: space-between;
