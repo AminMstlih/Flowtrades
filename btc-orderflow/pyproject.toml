@@ -20,6 +20,10 @@ dev = [
     "pytest-asyncio>=0.23",
 ]
 
+[project.scripts]
+flowtrades-dev = "dev_runner:main"
+flowtrades-prod = "prod_runner:main"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

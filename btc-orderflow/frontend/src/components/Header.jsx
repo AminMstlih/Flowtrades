@@ -1,57 +1,24 @@
-/**
- * Header — UI Chrome Component
- *
- * Wrapped in React.memo (Section 8.2) — prevents re-renders from chart data changes.
- * Reads from latestDataRef via a low-frequency interval (not per-tick).
- * 44px minimum touch targets on all interactive controls (Section 4.3).
- */
+import React from 'react';
+import { TICK_STEPS, snapTick } from '../utils/tickSteps';
 
-import React, { useState, useEffect, useRef } from 'react';
-
-export const Header = React.memo(function Header({ latestDataRef, connectionStatus }) {
-  // Low-frequency UI update — read ref on interval, NOT per WebSocket tick
-  const [displayData, setDisplayData] = useState({
-    lastPrice: 0,
-    totalTrades: 0,
-    totalCandles: 0,
-    windowSec: 300,
-    exchanges: [],
-  });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const data = latestDataRef.current;
-      if (data) {
-        setDisplayData({
-          lastPrice: data.last_price || 0,
-          totalTrades: data.total_trades || 0,
-          totalCandles: data.total_candles || 0,
-          windowSec: data.window_sec || 300,
-          exchanges: data.exchanges || [],
-        });
-      }
-    }, 500); // Update header at 2Hz max — no need for 60fps on text
-
-    return () => clearInterval(interval);
-  }, [latestDataRef]);
+export function Header({ state, isConnected, tickSize, setTickSize, autoFit, onAutoFitToggle }) {
+  const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
 
   const fmtPrice = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 1,
-  }).format(displayData.lastPrice);
+    minimumFractionDigits: 1
+  }).format(last_price);
 
-  const fmtTotal = new Intl.NumberFormat('en-US').format(displayData.totalTrades);
-  const fmtCandles = new Intl.NumberFormat('en-US').format(displayData.totalCandles);
+  const fmtTotal = new Intl.NumberFormat('en-US').format(total_trades);
+  const fmtCandles = new Intl.NumberFormat('en-US').format(total_candles);
 
   return (
-    <header className="header" role="toolbar">
+    <div className="header">
       <div className="header-left">
         <h1 className="title">⚡ BTC ORDER FLOW</h1>
         <div className="exchange-list">
-          {displayData.exchanges.length
-            ? displayData.exchanges.join(' • ').toUpperCase()
-            : 'WAITING FOR DATA...'}
+          {exchanges?.length ? exchanges.join(' • ').toUpperCase() : 'WAITING FOR DATA...'}
         </div>
       </div>
 
@@ -61,15 +28,37 @@ export const Header = React.memo(function Header({ latestDataRef, connectionStat
 
       <div className="header-right">
         <div className="controls-row">
-          <div className={`status-badge ${connectionStatus === 'connected' ? 'connected' : 'disconnected'}`}>
+          <div className="control-group">
+            <label>Tick Size</label>
+            <select
+              value={tickSize}
+              onChange={(e) => setTickSize(snapTick(Number(e.target.value), 'nearest'))}
+            >
+              {TICK_STEPS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
+            className={`auto-fit-badge ${autoFit ? 'active' : 'inactive'}`}
+            onClick={onAutoFitToggle}
+            title="Double-click price column to toggle"
+          >
+            {autoFit ? '● AUTO' : '○ FREE'}
+          </div>
+
+          <div className={`status-badge ${isConnected ? 'connected' : 'disconnected'}`}>
             <div className="status-dot"></div>
-            {connectionStatus === 'connected' ? 'LIVE' : connectionStatus === 'reconnecting' ? 'RECONNECTING' : 'OFFLINE'}
+            {isConnected ? 'LIVE' : 'OFFLINE'}
           </div>
         </div>
 
         <div className="stats-row">
           <div>
-            Interval: <span className="stat-value">{displayData.windowSec / 60}m</span>
+            Interval: <span className="stat-value">{window_sec / 60}m</span>
           </div>
           <div>
             Candles: <span className="stat-value">{fmtCandles}</span>
@@ -79,6 +68,6 @@ export const Header = React.memo(function Header({ latestDataRef, connectionStat
           </div>
         </div>
       </div>
-    </header>
+    </div>
   );
-});
+}
