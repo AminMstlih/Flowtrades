@@ -2,11 +2,13 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useFootprint } from './hooks/useFootprint';
 import { Header } from './components/Header';
 import { FootprintTable } from './components/FootprintTable';
+import { FootprintCanvas } from './components/FootprintCanvas';
 import { InteractiveViewport } from './components/InteractiveViewport';
 import { PriceScale } from './components/PriceScale';
 import { DeltaPane } from './components/DeltaPane';
 import { snapTick } from './utils/tickSteps';
 import { binCeilPrice, binFloorPrice, binRoundPrice, unbinPrice } from './utils/priceBinning';
+import { perfMonitor } from './utils/perfMonitor';
 
 // Connect to the FastAPI WebSocket broadcast
 // In dev mode, use the Vite proxy; in production, use the direct backend URL
@@ -54,6 +56,9 @@ function App() {
 
   // Auto-fit mode - when ON, chart auto-sizes to fit all candles
   const [autoFit, setAutoFit] = useState(false);
+  
+  // Rendering mode: 'dom' (FootprintTable) or 'canvas' (FootprintCanvas)
+  const [renderMode, setRenderMode] = useState('dom');
 
   // CRITICAL: requestAnimationFrame render loop (Guide Section 5.3)
   // Reads from latestDataRef and updates chartData state in batch
@@ -61,6 +66,9 @@ function App() {
     let animFrameId;
     
     function renderLoop() {
+      // Track frame rate (Guide Section 8)
+      perfMonitor.tick();
+      
       const newData = latestDataRef.current;
       if (newData) {
         // Consume data from ref and update state ONCE per frame
@@ -85,6 +93,25 @@ function App() {
     // Cleanup on unmount
     return () => cancelAnimationFrame(animFrameId);
   }, [latestDataRef]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Press 'R' to toggle render mode (DOM vs Canvas)
+      if (e.key === 'r' || e.key === 'R') {
+        setRenderMode(prev => prev === 'dom' ? 'canvas' : 'dom');
+        console.log(`[App] Render mode: ${renderMode === 'dom' ? 'canvas' : 'dom'}`);
+      }
+      
+      // Press 'P' to log performance report
+      if (e.key === 'p' || e.key === 'P') {
+        perfMonitor.logReport();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [renderMode]);
 
   const orderedCandles = useMemo(() => {
     const candles = chartData.candles || [];
@@ -254,13 +281,25 @@ function App() {
             onResize={setViewportSize}
             onUserPan={handleViewportUserInteract}
           >
-            <FootprintTable
+            {renderMode === 'canvas' ? null : (
+              <FootprintTable
+                candles={orderedCandles}
+                prices={prices}
+                tickSize={tickSize}
+                lastPrice={chartData.last_price}
+              />
+            )}
+          </InteractiveViewport>
+          
+          {/* Canvas overlay - sits ON TOP of viewport, not inside transformed content */}
+          {renderMode === 'canvas' && (
+            <FootprintCanvas
               candles={orderedCandles}
               prices={prices}
               tickSize={tickSize}
               lastPrice={chartData.last_price}
             />
-          </InteractiveViewport>
+          )}
           {currentPriceLine && (
             <div
               className="current-price-segment"

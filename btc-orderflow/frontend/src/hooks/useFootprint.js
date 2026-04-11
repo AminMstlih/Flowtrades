@@ -1,7 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { perfMonitor } from '../utils/perfMonitor';
 
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
+const MAX_WINDOW_SEC = 600; // 10 minutes - prevent memory leaks
+
+/**
+ * Prune old candles outside the time window.
+ * Per UI Engineering Guide Section 5.5: Time-windowed data
+ * 
+ * @param {Array} candles - All candles from backend
+ * @param {number} windowSec - Keep only candles within this window
+ * @returns {Array} Pruned candles
+ */
+function pruneTimeWindow(candles, windowSec = MAX_WINDOW_SEC) {
+  if (!candles || candles.length === 0) return [];
+  
+  const now = Date.now();
+  const cutoffMs = now - (windowSec * 1000);
+  
+  // Filter candles that are within the time window
+  return candles.filter(c => {
+    const candleTime = c.timestamp || c.ts || now;
+    return candleTime >= cutoffMs;
+  });
+}
 
 /**
  * WebSocket hook for real-time footprint data.
@@ -44,10 +67,18 @@ export function useFootprint(url) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        
+        // Track WebSocket message rate (Guide Section 8)
+        perfMonitor.onWsMessage();
+        
         // CRITICAL: Store in ref - DO NOT call setState here!
         // Parent component will read this via requestAnimationFrame loop
+        
+        // Apply time-window pruning to prevent memory leaks (Guide Section 5.5)
+        const prunedCandles = pruneTimeWindow(data.candles || []);
+        
         latestDataRef.current = {
-          candles: data.candles || [],
+          candles: prunedCandles,
           last_price: data.last_price || 0,
           window_sec: data.window_sec || 300,
           total_trades: data.total_trades || 0,

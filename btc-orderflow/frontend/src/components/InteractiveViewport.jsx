@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { GestureHandler } from '../utils/gestures';
 
 // A high-performance wrapper that gives a React Element infinite-canvas pan/zoom behavior.
 // Transform state is controlled by parent so chart/axis stay in lock-step.
@@ -115,6 +116,76 @@ export function InteractiveViewport({
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
+
+  // Initialize GestureHandler for touch support
+  const gestureHandlerRef = useRef(null);
+  
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Create gesture handler with callbacks
+    gestureHandlerRef.current = new GestureHandler(containerRef.current, {
+      onPan: (dx, dy) => {
+        if (onUserPan) onUserPan(true);
+        
+        onTransformChange({
+          ...transform,
+          x: transform.x + dx,
+          y: transform.y + dy
+        });
+      },
+      onZoom: (scaleFactor, midpoint) => {
+        if (onUserPan) onUserPan(true);
+        
+        let newScaleX = transform.scaleX * scaleFactor;
+        let newScaleY = transform.scaleY * scaleFactor;
+        
+        // Clamp scale
+        newScaleX = Math.min(Math.max(0.1, newScaleX), 10);
+        newScaleY = Math.min(Math.max(0.1, newScaleY), 10);
+        
+        // Zoom from midpoint (Guide Section 4.2)
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = midpoint.x - rect.left;
+        const y = midpoint.y - rect.top;
+        
+        const oldScaleX = transform.scaleX;
+        const oldScaleY = transform.scaleY;
+        
+        const newX = x - ((x - transform.x) / oldScaleX) * newScaleX;
+        const newY = y - ((y - transform.y) / oldScaleY) * newScaleY;
+        
+        onTransformChange({
+          x: newX,
+          y: newY,
+          scaleX: newScaleX,
+          scaleY: newScaleY
+        });
+      },
+      onDoubleTap: () => {
+        // Reset to fit content
+        if (onTransformChange) {
+          onTransformChange({
+            x: 0,
+            y: 0,
+            scaleX: 1,
+            scaleY: 1
+          });
+        }
+      },
+      onLongPress: ({ x, y }) => {
+        // Could lock crosshair here in future
+        console.log('[Gesture] Long press at:', x, y);
+      }
+    });
+
+    // Cleanup
+    return () => {
+      if (gestureHandlerRef.current) {
+        gestureHandlerRef.current.destroy();
+      }
+    };
+  }, [transform, onTransformChange, onUserPan]);
 
   return (
     <div

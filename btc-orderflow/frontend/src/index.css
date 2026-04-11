@@ -1180,11 +1180,6 @@ body {
   .exchange-list {
     font-size: 0.75rem;
   }
-
-  /* Tablet can show side-by-side layout if needed */
-  .main-viewport-wrapper {
-    /* Keep current flex layout for now */
-  }
 }
 
 /* lg (desktop): 1024px+ */
