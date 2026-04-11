@@ -15,6 +15,7 @@ Run: python main.py
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
 import sys
 from pathlib import Path
@@ -68,7 +69,13 @@ async def main() -> None:
       1. Exchange Supervisor (manages all WS clients)
       2. Aggregation task (bus → state)
       3. FastAPI + uvicorn server (state → web clients)
+    
+    Environment Variables:
+      FLOWTRADES_DEV_MODE=1 - Skip serving built frontend (use Vite dev server instead)
     """
+    # Check if running in dev mode
+    dev_mode = os.getenv("FLOWTRADES_DEV_MODE", "0") == "1"
+    serve_frontend = not dev_mode
     # ── Load Config ──────────────────────────────────────────
     config_path = Path(__file__).parent / "config.toml"
     config = load_config(config_path)
@@ -103,6 +110,7 @@ async def main() -> None:
         num_rows=config.display.rows,
         refresh_rate_ms=config.display.refresh_rate_ms,
         enabled_exchanges=config.exchanges.enabled,
+        serve_frontend=serve_frontend,
     )
 
     # ── Start Tasks ──────────────────────────────────────────
@@ -129,6 +137,10 @@ async def main() -> None:
     )
 
     logger.info("server_started", url="http://localhost:8000")
+    if dev_mode:
+        logger.info("dev_mode_active", frontend_url="http://localhost:5173")
+    else:
+        logger.info("production_mode", frontend_served="http://localhost:8000")
     logger.info(
         "ws_endpoint",
         url="ws://localhost:8000/ws/footprint",

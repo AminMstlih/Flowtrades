@@ -30,9 +30,9 @@ class BaseExchangeClient(abc.ABC):
     The base class handles connection lifecycle, reconnection, and heartbeats.
     """
 
-    BACKOFF_BASE: float = 1.0
-    BACKOFF_MAX: float = 60.0
-    MAX_RECONNECT_ATTEMPTS: int = 100  # ~16 min total before giving up
+    BACKOFF_BASE: float = 2.0  # Start at 2s (was 1s) for slower reconnection
+    BACKOFF_MAX: float = 120.0  # Cap at 2 minutes (was 60s) to reduce spam
+    MAX_RECONNECT_ATTEMPTS: int = 50  # Stop after ~50 attempts (~1 hour total)
 
     def __init__(self, exchange_name: str) -> None:
         self.exchange_name = exchange_name
@@ -126,8 +126,8 @@ class BaseExchangeClient(abc.ABC):
 
         async with ws_connect(
             self.ws_url,
-            ping_interval=20,
-            ping_timeout=10,
+            ping_interval=30,    # Increased from 20 to 30 seconds (less aggressive)
+            ping_timeout=15,     # Increased from 10 to 15 seconds (more tolerant)
             close_timeout=5,
         ) as ws:
             self._ws = ws

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -31,6 +32,7 @@ def create_app(
     refresh_rate_ms: int = 500,
     cors_origins: list[str] | None = None,
     enabled_exchanges: list[str] | None = None,
+    serve_frontend: bool = True,
 ) -> FastAPI:
     """Create the FastAPI application with WebSocket broadcast."""
 
@@ -51,7 +53,7 @@ def create_app(
     # Track connected clients
     connected_clients: list[WebSocket] = []
 
-    @app.get("/")
+    @app.get("/health")
     async def health():
         stats = state.stats
         return {
@@ -123,5 +125,15 @@ def create_app(
                 client_id=client_id,
                 remaining=len(connected_clients),
             )
+
+    # Mount static files LAST (after all routes are defined)
+    # This prevents StaticFiles from intercepting WebSocket connections
+    if serve_frontend:
+        frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+        if frontend_dist.exists():
+            app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+            logger.info("frontend_served_from", path=str(frontend_dist))
+        else:
+            logger.warning("frontend_dist_not_found", path=str(frontend_dist))
 
     return app

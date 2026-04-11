@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "cd .. && python dev_runner.py",
     "build": "vite build",
+    "build:prod": "vite build && cd .. && python main.py",
     "lint": "eslint .",
     "preview": "vite preview"
   },

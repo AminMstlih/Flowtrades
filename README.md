@@ -1,3 +1,43 @@
+# Flowtrades
+
+Real-time BTC order flow visualization across Binance, OKX, and Bybit exchanges.
+
+## Quick Start
+
+### For Development (Hot Reload)
+```bash
+cd btc-orderflow
+python dev_runner.py
+```
+Access: http://localhost:5173
+
+### For Production (Single Server) ⭐
+```bash
+cd btc-orderflow
+python prod_runner.py
+```
+Access: http://localhost:8000
+
+## Documentation
+
+See [btc-orderflow/DEV_GUIDE.md](btc-orderflow/DEV_GUIDE.md) for detailed setup instructions.
+
+## Features
+
+- 🔄 Real-time order flow aggregation from multiple exchanges
+- 📊 Interactive footprint chart with price ladder
+- 🎯 Detection of large trades, imbalances, and absorption
+- 🚀 Production-ready single-server deployment
+- 🔥 Development mode with hot reload
+
+## Architecture
+
+```
+Exchange APIs → Normalization → Trade Bus → Aggregation → FastAPI Server → React Frontend
+                                                    ↕
+                                              WebSocket Broadcast
+```
+
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/4accfa67-04a7-424e-928d-9574127f7a88" />
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/e1bbe359-7be9-45cc-9012-84626569c08a" />
 <img width="768" height="1676" alt="image" src="https://github.com/user-attachments/assets/4ed187f8-92c2-4141-9e00-1bc6df3e57b6" />
@@ -94,17 +134,25 @@ git clone https://github.com/AminMstlih/Flowtrades.git
 cd Flowtrades/btc-orderflow
 
 # Install Python dependencies
-pip install -r requirements.txt
-
-# Run
-cd Flowtrades/btc-orderflow/frontend
-npm run dev
-
-cd Flowtrades/btc-orderflow
-python main.py
 ```
+cd Flowtrades/btc-orderflow
+pip install -r requirements.txt
+```
+## Quick Start
 
-Open your browser and go to `http://localhost:5173`
+### For Development (Hot Reload)
+```bash
+cd btc-orderflow
+python dev_runner.py
+```
+Access: http://localhost:5173
+
+### For Production (Single Server) ⭐
+```bash
+cd btc-orderflow
+python prod_runner.py
+```
+Access: http://localhost:8000
 
 > ⚠️ **Note:** This project is actively being built. Expect rough edges. If something breaks, open an issue.
 

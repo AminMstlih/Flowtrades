@@ -9,7 +9,10 @@ import { snapTick } from './utils/tickSteps';
 import { binCeilPrice, binFloorPrice, binRoundPrice, unbinPrice } from './utils/priceBinning';
 
 // Connect to the FastAPI WebSocket broadcast
-const WS_URL = 'ws://localhost:8000/ws/footprint';
+// In dev mode, use the Vite proxy; in production, use the direct backend URL
+const WS_URL = import.meta.env.DEV 
+  ? 'ws://localhost:5173/ws/footprint'  // Vite dev server with proxy
+  : 'ws://localhost:8000/ws/footprint'; // Direct backend connection
 
 const CELL_HEIGHT = 24;
 const CELL_WIDTH = 140;
