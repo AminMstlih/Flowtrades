@@ -53,7 +53,7 @@ def create_app(
     # Track connected clients
     connected_clients: list[WebSocket] = []
 
-    @app.get("/")
+    @app.get("/health")
     async def health():
         stats = state.stats
         return {
