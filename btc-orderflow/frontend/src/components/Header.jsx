@@ -1,8 +1,14 @@
 import React from 'react';
 import { TICK_STEPS, snapTick } from '../utils/tickSteps';
 
-export function Header({ state, isConnected, tickSize, setTickSize, autoFit, onAutoFitToggle }) {
+export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFitToggle }) {
   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
+  
+  // Map status to display values
+  const isConnected = status === 'connected';
+  const statusText = status === 'connected' ? 'LIVE' : 
+                     status === 'reconnecting' ? 'RECONNECTING' : 
+                     status === 'connecting' ? 'CONNECTING' : 'OFFLINE';
 
   const fmtPrice = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -52,7 +58,7 @@ export function Header({ state, isConnected, tickSize, setTickSize, autoFit, onA
 
           <div className={`status-badge ${isConnected ? 'connected' : 'disconnected'}`}>
             <div className="status-dot"></div>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
+            {statusText}
           </div>
         </div>
 
