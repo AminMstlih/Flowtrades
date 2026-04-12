@@ -35,85 +35,39 @@ function DetectionBadge({ flag }) {
   );
 }
 
-export function FootprintTable({ candles, prices: sharedPrices = null, tickSize = 1.0, lastPrice = null }) {
-
-  const { aggCandles, prices: internalPrices, pocsByCandle, maxVolumeGlobal } = useMemo(() => {
-    if (!candles || candles.length === 0) {
-      return { aggCandles: [], prices: [], pocsByCandle: {}, maxVolumeGlobal: 1 };
-    }
-
-    let maxVGlobal = 0;
-    const uniquePrices = new Set();
+export function FootprintTable({ candles, aggCandles = [], maxVolumeGlobal = 1, prices: sharedPrices = null, tickSize = 1.0, lastPrice = null, showBadges = true }) {
+  // Use pocsByCandle just like we computed it (we can recompute it minimally or just find the max dynamically if needed).
+  // Actually, we can compute pocsByCandle here simply or pass it from App.jsx. Let's compute it simply for the table:
+  const pocsByCandle = useMemo(() => {
     const pocs = {};
-    const newlyAggregatedCandles = [];
-
-    candles.forEach((c, i) => {
-      let maxVolInCandle = -1;
+    (aggCandles || []).forEach((c, i) => {
+      let maxV = -1;
       let pocPrice = null;
-      const aggregatedBuckets = new Map();
-
-      if (c.buckets) {
-        // Pre-filter buckets to match the visible price range more efficiently
-        c.buckets.forEach(b => {
-          const binnedPrice = unbinPrice(binFloorPrice(b.price, tickSize), tickSize);
-          uniquePrices.add(binnedPrice);
-
-          if (!aggregatedBuckets.has(binnedPrice)) {
-            aggregatedBuckets.set(binnedPrice, {
-              price: binnedPrice,
-              buy_vol: 0,
-              sell_vol: 0,
-              delta: 0
-            });
-          }
-          const agg = aggregatedBuckets.get(binnedPrice);
-          agg.buy_vol += b.buy_vol;
-          agg.sell_vol += b.sell_vol;
-          agg.delta += b.delta;
-        });
-
-        aggregatedBuckets.forEach(b => {
-          const cellV = b.buy_vol + b.sell_vol;
-          if (cellV > maxVGlobal) maxVGlobal = cellV;
-
-          if (cellV > maxVolInCandle) {
-            maxVolInCandle = cellV;
-            pocPrice = b.price;
-          }
-        });
-      }
-
-      pocs[i] = pocPrice;
-
-      newlyAggregatedCandles.push({
-        ...c,
-        aggBuckets: Array.from(aggregatedBuckets.values())
+      (c.aggBuckets || []).forEach(b => {
+        const v = b.buy_vol + b.sell_vol;
+        if (v > maxV) {
+          maxV = v;
+          pocPrice = b.price;
+        }
       });
+      pocs[i] = pocPrice;
     });
-
-    const pricesArray = Array.from(uniquePrices).sort((a, b) => b - a);
-
-    return {
-      aggCandles: newlyAggregatedCandles,
-      prices: pricesArray,
-      pocsByCandle: pocs,
-      maxVolumeGlobal: Math.max(maxVGlobal, 1)
-    };
-  }, [candles, tickSize]);
+    return pocs;
+  }, [aggCandles]);
 
   const priceEps = tickSize / 1000;
   const currentPriceBinned = lastPrice !== null && lastPrice !== undefined
     ? unbinPrice(binFloorPrice(lastPrice, tickSize), tickSize)
     : null;
   const prices = useMemo(() => {
-    const base = sharedPrices && sharedPrices.length > 0 ? [...sharedPrices] : [...internalPrices];
+    const base = sharedPrices ? [...sharedPrices] : [];
     if (currentPriceBinned === null) return base;
     if (!base.some(p => Math.abs(p - currentPriceBinned) <= priceEps)) {
       base.push(currentPriceBinned);
       base.sort((a, b) => b - a);
     }
     return base;
-  }, [sharedPrices, internalPrices, currentPriceBinned]);
+  }, [sharedPrices, currentPriceBinned, priceEps]);
 
   if (!candles || candles.length === 0 || prices.length === 0) {
     return (
@@ -140,7 +94,7 @@ export function FootprintTable({ candles, prices: sharedPrices = null, tickSize 
           return (
             <tr key={price} className={isCurrentPriceRow ? 'current-price-row' : ''} style={{ height: `${CELL_HEIGHT}px`, background: isCurrentPriceRow ? 'rgba(255,152,0,0.05)' : 'transparent' }}>
               {aggCandles.map((c, i) => {
-                const bucket = c.aggBuckets.find(b => Math.abs(b.price - price) <= priceEps);
+                const bucket = c.aggBuckets?.find(b => Math.abs(b.price - price) <= priceEps);
                 const isPOC = pocsByCandle[i] !== null && Math.abs(pocsByCandle[i] - price) <= priceEps;
 
                 const isBody = price <= Math.max(c.open, c.close) && price >= Math.min(c.open, c.close);
@@ -195,7 +149,7 @@ export function FootprintTable({ candles, prices: sharedPrices = null, tickSize 
                       <span className={`vol-left ${sellImb ? 'imb-sell' : ''}`}>{formatVol(bucket.sell_vol)}</span>
                       <span className={`vol-right ${buyImb ? 'imb-buy' : ''}`}>{formatVol(bucket.buy_vol)}</span>
                     </div>
-                    {badges.length > 0 && (
+                    {showBadges && badges.length > 0 && (
                       <div className="detection-badges" style={{ position: 'absolute', bottom: '1px', right: '1px' }}>
                         {badges.map((flag, fi) => <DetectionBadge key={fi} flag={flag} />)}
                       </div>

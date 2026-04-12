@@ -4,25 +4,25 @@
   --bg-secondary: #111F2E;
   --bg-elevated: #162436;
   --bg-row-alt: #0A1520;
-  
+
   --text-primary: #E0E7EF;
   --text-secondary: #8FA8BE;
   --text-muted: #4A6A82;
-  
+
   --accent-buy: #26A69A;
   --accent-sell: #EF5350;
   --accent-neutral: #546E7A;
   --accent-flag: #F9A825;
   --accent-blue: #1565C0;
-  
+
   --border-subtle: #1E3448;
   --border-strong: #2E5070;
-  
+
   --candle-up: #26A69A;
   --candle-down: #EF5350;
   --crosshair: #8FA8BE;
   --current-price: #F9A825;
-  
+
   /* Legacy compatibility */
   --bg-dark: #0D1B2A;
   --bg-panel: #111F2E;
@@ -54,8 +54,10 @@ body {
   display: flex;
   flex-direction: column;
   /* Guide Section 2.4: Use 100dvh NOT 100vh for mobile */
-  height: 100vh; /* Fallback for older browsers */
-  height: 100dvh; /* Modern browsers - handles mobile browser chrome */
+  height: 100vh;
+  /* Fallback for older browsers */
+  height: 100dvh;
+  /* Modern browsers - handles mobile browser chrome */
 }
 
 /* ── VIEWPORT LAYOUT ────────────────────────────────── */
@@ -114,7 +116,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 12px;
+  padding-right: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -1041,6 +1043,7 @@ body {
    ======================================== */
 
 @media (max-width: 767px) {
+
   /* All interactive elements need minimum 44x44px touch area */
   button,
   select,
@@ -1086,7 +1089,8 @@ body {
   }
 
   .header-center {
-    display: none; /* Hide large price on mobile */
+    display: none;
+    /* Hide large price on mobile */
   }
 
   .header-right {
@@ -1104,7 +1108,8 @@ body {
   }
 
   .control-group {
-    min-width: 44px; /* Guide Section 4.3: Touch target */
+    min-width: 44px;
+    /* Guide Section 4.3: Touch target */
   }
 
   .control-group select {
@@ -1132,7 +1137,8 @@ body {
   }
 
   .price-axis-sidebar {
-    width: 70px; /* Narrower on mobile */
+    width: 70px;
+    /* Narrower on mobile */
   }
 
   .fixed-bottom-panels {
@@ -1248,7 +1254,8 @@ body {
   }
 
   .price-axis-sidebar {
-    width: 120px; /* Wider for 4K */
+    width: 120px;
+    /* Wider for 4K */
   }
 
   .price-tick {

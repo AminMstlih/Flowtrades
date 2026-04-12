@@ -21,10 +21,12 @@ import { binFloorPrice, unbinPrice } from '../utils/priceBinning';
  */
 export function FootprintCanvas({ 
   candles = [], 
+  aggCandles = [],
   prices = [], 
   tickSize = 1.0, 
   lastPrice = null,
-  chartRef = null 
+  transform = { x: 0, y: 0, scaleX: 1, scaleY: 1 },
+  showBadges = true
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -44,6 +46,7 @@ export function FootprintCanvas({
   };
 
   const ROW_HEIGHT = 24; // Logical pixels
+  const HEADER_HEIGHT = 32; // Offset for DOM Table header
   const priceEps = tickSize / 1000;
 
   // Initialize canvas with HiDPI support
@@ -130,11 +133,10 @@ export function FootprintCanvas({
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
-    
-    // DEBUG: Draw a red border so we can see the canvas bounds
-    ctx.strokeStyle = 'red';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, width - 2, height - 2);
+
+    ctx.save();
+    ctx.translate(transform.x, transform.y);
+    // ctx.scale(transform.scaleX, transform.scaleY); // Skip scaling for text crispness unless we also apply it
 
     // Calculate current price
     const currentPriceBinned = lastPrice !== null && lastPrice !== undefined
@@ -142,17 +144,19 @@ export function FootprintCanvas({
       : null;
 
     // Column positions
-    const colWidth = 70;
+    const colWidth = 140; // Matched exactly to CELL_WIDTH in App.jsx
     const priceColWidth = 80;
     const totalCols = candles.length;
     const tableWidth = priceColWidth + (totalCols * colWidth);
 
     // Draw each price row
     prices.forEach((price, rowIndex) => {
-      const y = rowIndex * ROW_HEIGHT;
+      const y = (rowIndex * ROW_HEIGHT) + HEADER_HEIGHT;
       
-      // Skip if off-screen
-      if (y < 0 || y > height) return;
+      // Skip if off-screen (canvas only translates, no scale applied)
+      const screenY = transform.y + y;
+      const screenBottom = screenY + ROW_HEIGHT;
+      if (screenBottom < 0 || screenY > height) return;
 
       const isCurrentPriceRow = currentPriceBinned !== null && 
         Math.abs(price - currentPriceBinned) <= priceEps;
@@ -170,7 +174,7 @@ export function FootprintCanvas({
       ctx.fillText(price.toFixed(1), priceColWidth - 8, y + ROW_HEIGHT / 2);
 
       // Draw cells for each candle
-      candles.forEach((candle, colIndex) => {
+      aggCandles.forEach((candle, colIndex) => {
         const x = priceColWidth + (colIndex * colWidth);
         
         // Find bucket for this price
@@ -194,7 +198,7 @@ export function FootprintCanvas({
 
         // Calculate volume opacity
         const cellVol = bucket.buy_vol + bucket.sell_vol;
-        const maxVol = Math.max(...candles.flatMap(c => 
+        const maxVol = Math.max(...aggCandles.flatMap(c => 
           c.aggBuckets?.map(b => b.buy_vol + b.sell_vol) || [0]
         ), 1);
         const opacity = Math.min(cellVol / maxVol, 1.0);
@@ -241,7 +245,7 @@ export function FootprintCanvas({
         }
 
         // Detection flags (non-IMB)
-        if (hasBackendFlags) {
+        if (showBadges && hasBackendFlags) {
           const badges = bucket.flags.filter(f => f.type !== 'IMB');
           if (badges.length > 0) {
             ctx.fillStyle = colors.flagColor;
@@ -252,7 +256,9 @@ export function FootprintCanvas({
         }
       });
     });
-  }, [candles, prices, tickSize, lastPrice, colors]);
+
+    ctx.restore();
+  }, [candles, aggCandles, prices, tickSize, lastPrice, colors, transform, showBadges]);
 
   // Redraw when data changes (don't include drawFootprint in deps to avoid infinite loop)
   useEffect(() => {
@@ -260,7 +266,7 @@ export function FootprintCanvas({
     if (!ctxRef.current || sizeRef.current.width === 0) return;
     
     drawFootprint();
-  }, [candles, prices, tickSize, lastPrice]); // Only redraw when data changes
+  }, [candles, aggCandles, prices, tickSize, lastPrice, transform, showBadges]); // Only redraw when data changes
 
   return (
     <canvas

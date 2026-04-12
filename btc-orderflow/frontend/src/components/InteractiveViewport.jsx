@@ -12,160 +12,129 @@ export function InteractiveViewport({
 }) {
   const containerRef = useRef(null);
 
-  // Drag state
-  const isDragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-  useEffect(() => {
-    if (!onResize || !containerRef.current) return;
-    const el = containerRef.current;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      onResize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onResize]);
+  // Inertia state
+  const velocityRef = useRef({ x: 0, y: 0 });
+  const panHistoryRef = useRef([]); // track {x, y, time}
+  const rAFRef = useRef(null);
 
-  const handlePointerDown = (e) => {
-    if (e.button !== 0) return;
+  const applyInertia = useCallback(() => {
+    const decay = 0.95; // Friction coefficient
+    const threshold = 0.5; // Stop when velocity is below this
 
-    // We only drag the background (InteractiveViewport) - the Axis handles its own drag
-    isDragging.current = true;
-    lastPos.current = { x: e.clientX, y: e.clientY };
+    let vx = velocityRef.current.x;
+    let vy = velocityRef.current.y;
 
-    if (containerRef.current) {
-      containerRef.current.style.cursor = 'grabbing';
+    if (Math.abs(vx) < threshold && Math.abs(vy) < threshold) {
+      rAFRef.current = null;
+      return;
     }
 
-    e.target.setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMove = useCallback((e) => {
-    if (!isDragging.current) return;
-
-    if (onUserPan) onUserPan(true);
-
-    const dx = e.clientX - lastPos.current.x;
-    const dy = e.clientY - lastPos.current.y;
-
-    onTransformChange({
-      ...transform,
-      x: transform.x + dx,
-      y: transform.y + dy
-    });
-
-    lastPos.current = { x: e.clientX, y: e.clientY };
-  }, [onTransformChange, onUserPan, transform]);
-
-  const handlePointerUp = (e) => {
-    isDragging.current = false;
-    if (containerRef.current) {
-      containerRef.current.style.cursor = 'grab';
-    }
-    e.target.releasePointerCapture(e.pointerId);
-  };
-
-  // Wheel to zoom (Uniform zoom)
-  const handleWheel = useCallback((e) => {
-    // Prevent accidental zoom from wheel/trackpad gestures.
-    // Require explicit Shift+Ctrl/Cmd + wheel to zoom.
-    const explicitZoomGesture = (e.ctrlKey || e.metaKey) && e.shiftKey;
-    if (!explicitZoomGesture) return;
-    e.preventDefault();
-    if (onUserPan) onUserPan(true);
-
-    const scaleFactor = 1.05;
-
-    let newScaleX = transform.scaleX;
-    let newScaleY = transform.scaleY;
-
-    if (e.deltaY < 0) {
-      newScaleX *= scaleFactor;
-      newScaleY *= scaleFactor;
-    } else {
-      newScaleX /= scaleFactor;
-      newScaleY /= scaleFactor;
+    // Apply current velocity
+    const { onTransformChange: onChange } = stateRef.current;
+    if (onChange) {
+      // Use functional update to avoid rAF race conditions with React state
+      onChange(prev => ({
+        ...prev,
+        x: prev.x + vx,
+        y: prev.y + vy
+      }));
     }
 
-    newScaleX = Math.min(Math.max(.1, newScaleX), 10);
-    newScaleY = Math.min(Math.max(.1, newScaleY), 10);
+    // Decay velocity
+    velocityRef.current.x *= decay;
+    velocityRef.current.y *= decay;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const cursorX = e.clientX - rect.left;
-    const cursorY = e.clientY - rect.top;
-
-    // Adjust X and Y to zoom toward cursor
-    const xAdj = (cursorX - transform.x) * (1 - newScaleX / transform.scaleX);
-    const yAdj = (cursorY - transform.y) * (1 - newScaleY / transform.scaleY);
-
-    onTransformChange({
-      scaleX: newScaleX,
-      scaleY: newScaleY,
-      x: transform.x + xAdj,
-      y: transform.y + yAdj
-    });
-  }, [onTransformChange, onUserPan, transform]);
+    rAFRef.current = requestAnimationFrame(applyInertia);
+  }, []);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
+    return () => {
+      if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
+    };
+  }, []);
 
   // Initialize GestureHandler for touch support
   const gestureHandlerRef = useRef(null);
+  const stateRef = useRef({ transform, onTransformChange, onUserPan });
+  
+  useEffect(() => {
+    stateRef.current = { transform, onTransformChange, onUserPan };
+  }, [transform, onTransformChange, onUserPan]);
   
   useEffect(() => {
     if (!containerRef.current) return;
 
     // Create gesture handler with callbacks
     gestureHandlerRef.current = new GestureHandler(containerRef.current, {
+      onPanStart: () => {
+        if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
+        panHistoryRef.current = [];
+      },
       onPan: (dx, dy) => {
-        if (onUserPan) onUserPan(true);
+        const { transform: t, onTransformChange: onChange, onUserPan: onPan } = stateRef.current;
+        if (onPan) onPan(true);
         
-        onTransformChange({
-          ...transform,
-          x: transform.x + dx,
-          y: transform.y + dy
-        });
+        // Track history for momentum calculation
+        panHistoryRef.current.push({ x: t.x + dx, y: t.y + dy, time: Date.now() });
+        if (panHistoryRef.current.length > 5) panHistoryRef.current.shift();
+        
+        onChange(prev => ({
+          ...prev,
+          x: prev.x + dx,
+          y: prev.y + dy
+        }));
+      },
+      onPanEnd: () => {
+        const history = panHistoryRef.current;
+        if (history.length < 2) return;
+        
+        const first = history[0];
+        const last = history[history.length - 1];
+        const dt = last.time - first.time;
+        if (dt > 0 && dt < 150) { // Only apply momentum for fast flicks
+          const vx = (last.x - first.x) / dt * 16; // pixels per frame (approx 60fps)
+          const vy = (last.y - first.y) / dt * 16;
+          
+          velocityRef.current = { x: vx, y: vy };
+          rAFRef.current = requestAnimationFrame(applyInertia);
+        }
       },
       onZoom: (scaleFactor, midpoint) => {
-        if (onUserPan) onUserPan(true);
+        const { onTransformChange: onChange, onUserPan: onPan } = stateRef.current;
+        if (onPan) onPan(true);
         
-        let newScaleX = transform.scaleX * scaleFactor;
-        let newScaleY = transform.scaleY * scaleFactor;
-        
-        // Clamp scale
-        newScaleX = Math.min(Math.max(0.1, newScaleX), 10);
-        newScaleY = Math.min(Math.max(0.1, newScaleY), 10);
-        
-        // Zoom from midpoint (Guide Section 4.2)
-        const rect = containerRef.current.getBoundingClientRect();
-        const x = midpoint.x - rect.left;
-        const y = midpoint.y - rect.top;
-        
-        const oldScaleX = transform.scaleX;
-        const oldScaleY = transform.scaleY;
-        
-        const newX = x - ((x - transform.x) / oldScaleX) * newScaleX;
-        const newY = y - ((y - transform.y) / oldScaleY) * newScaleY;
-        
-        onTransformChange({
-          x: newX,
-          y: newY,
-          scaleX: newScaleX,
-          scaleY: newScaleY
+        onChange(prev => {
+          let newScaleX = prev.scaleX * scaleFactor;
+          let newScaleY = prev.scaleY * scaleFactor;
+          
+          // Clamp scale
+          newScaleX = Math.min(Math.max(0.1, newScaleX), 10);
+          newScaleY = Math.min(Math.max(0.1, newScaleY), 10);
+          
+          // Zoom from midpoint
+          const rect = containerRef.current.getBoundingClientRect();
+          const x = midpoint.x - rect.left;
+          const y = midpoint.y - rect.top;
+          
+          const oldScaleX = prev.scaleX;
+          const oldScaleY = prev.scaleY;
+          
+          const newX = x - ((x - prev.x) / oldScaleX) * newScaleX;
+          const newY = y - ((y - prev.y) / oldScaleY) * newScaleY;
+          
+          return {
+            x: newX,
+            y: newY,
+            scaleX: newScaleX,
+            scaleY: newScaleY
+          };
         });
       },
       onDoubleTap: () => {
+        const { onTransformChange: onChange } = stateRef.current;
         // Reset to fit content
-        if (onTransformChange) {
-          onTransformChange({
+        if (onChange) {
+          onChange({
             x: 0,
             y: 0,
             scaleX: 1,
@@ -185,16 +154,27 @@ export function InteractiveViewport({
         gestureHandlerRef.current.destroy();
       }
     };
-  }, [transform, onTransformChange, onUserPan]);
+  }, []);
+
+  useEffect(() => {
+    if (!onResize || !containerRef.current) return;
+    const el = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      onResize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onResize]);
 
   return (
     <div
       ref={containerRef}
       className="viewport-container"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
       style={{
         overflow: 'hidden',
         position: 'relative',

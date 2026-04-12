@@ -1,7 +1,7 @@
 import React from 'react';
 import { TICK_STEPS, snapTick } from '../utils/tickSteps';
 
-export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFitToggle }) {
+export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
   
   // Map status to display values
@@ -48,12 +48,36 @@ export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFi
             </select>
           </div>
 
+          <div className="control-group">
+            <label>Timeframe</label>
+            <select
+              value={timeframeWindow}
+              onChange={(e) => setTimeframeWindow(Number(e.target.value))}
+            >
+              <option value={1}>1m</option>
+              <option value={5}>5m</option>
+              <option value={15}>15m</option>
+              <option value={60}>1h</option>
+              <option value={240}>4h</option>
+              <option value={1440}>1D</option>
+            </select>
+          </div>
+
           <div
             className={`auto-fit-badge ${autoFit ? 'active' : 'inactive'}`}
             onClick={onAutoFitToggle}
             title="Double-click price column to toggle"
           >
-            {autoFit ? '● AUTO' : '○ FREE'}
+            AUTO-FIT
+          </div>
+
+          <div
+            className={`auto-fit-badge ${showBadges ? 'active' : 'inactive'}`}
+            onClick={() => setShowBadges(prev => !prev)}
+            title="Press 'B' to toggle"
+            style={{ marginLeft: '8px' }}
+          >
+            BADGES
           </div>
 
           <div className={`status-badge ${isConnected ? 'connected' : 'disconnected'}`}>

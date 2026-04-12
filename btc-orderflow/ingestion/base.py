@@ -124,11 +124,17 @@ class BaseExchangeClient(abc.ABC):
         """Establish connection, subscribe, and enter listen loop."""
         logger.info("ws_connecting", exchange=self.exchange_name, url=self.ws_url)
 
+        import ssl
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
         async with ws_connect(
             self.ws_url,
             ping_interval=30,    # Increased from 20 to 30 seconds (less aggressive)
             ping_timeout=15,     # Increased from 10 to 15 seconds (more tolerant)
             close_timeout=5,
+            ssl=ssl_context if self.ws_url.startswith("wss://") else None
         ) as ws:
             self._ws = ws
             self._reconnect_count = 0

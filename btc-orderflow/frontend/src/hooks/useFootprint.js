@@ -21,7 +21,7 @@ function pruneTimeWindow(candles, windowSec = MAX_WINDOW_SEC) {
   
   // Filter candles that are within the time window
   return candles.filter(c => {
-    const candleTime = c.timestamp || c.ts || now;
+    const candleTime = c.start_time || c.end_time || c.timestamp || c.ts || now;
     return candleTime >= cutoffMs;
   });
 }
@@ -119,7 +119,10 @@ export function useFootprint(url) {
   useEffect(() => {
     connect();
     return () => {
+      // Clean up cleanly - remove the onclose listener FIRST
+      // so we don't trigger the aggressive reconnect logic for an intentionally closed socket
       if (wsRef.current) {
+        wsRef.current.onclose = null;
         wsRef.current.close();
       }
       if (reconnectTimeoutRef.current) {

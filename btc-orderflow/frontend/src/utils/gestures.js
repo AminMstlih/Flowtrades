@@ -103,6 +103,11 @@ export class GestureHandler {
       this.isPanning = true;
       this.panStartPos = { x: touch.clientX, y: touch.clientY };
       
+      // Notify pan start (for momentum initialization)
+      if (this.callbacks.onPanStart) {
+        this.callbacks.onPanStart({ x: touch.clientX, y: touch.clientY });
+      }
+      
       // Start long press timer
       this.longPressTimer = setTimeout(() => {
         if (this.callbacks.onLongPress) {
@@ -187,6 +192,11 @@ export class GestureHandler {
           this.lastTapTime = Date.now();
         }
       }
+    }
+    
+    // Notify pan end (for momentum calculation)
+    if (this.callbacks.onPanEnd) {
+      this.callbacks.onPanEnd();
     }
     
     this.isPanning = false;
