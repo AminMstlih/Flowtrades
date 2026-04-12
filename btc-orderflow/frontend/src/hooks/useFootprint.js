@@ -3,7 +3,7 @@ import { perfMonitor } from '../utils/perfMonitor';
 
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
-const MAX_WINDOW_SEC = 600; // 10 minutes - prevent memory leaks
+const MAX_WINDOW_SEC = 86400; // 24 hours - allow history for higher timeframes
 
 /**
  * Prune old candles outside the time window.

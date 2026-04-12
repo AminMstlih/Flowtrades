@@ -37,12 +37,12 @@ class FootprintState:
         absorption_price_pct: float = 0.05,
     ) -> None:
         self.charts = {
-            1: FootprintChart(bucket_size=bucket_size, interval_seconds=60, max_candles=50),
-            5: FootprintChart(bucket_size=bucket_size, interval_seconds=300, max_candles=50),
-            15: FootprintChart(bucket_size=bucket_size, interval_seconds=900, max_candles=50),
-            60: FootprintChart(bucket_size=bucket_size, interval_seconds=3600, max_candles=50),
-            240: FootprintChart(bucket_size=bucket_size, interval_seconds=14400, max_candles=50),
-            1440: FootprintChart(bucket_size=bucket_size, interval_seconds=86400, max_candles=50),
+            1: FootprintChart(bucket_size=bucket_size, interval_seconds=60, max_candles=200),
+            5: FootprintChart(bucket_size=bucket_size, interval_seconds=300, max_candles=200),
+            15: FootprintChart(bucket_size=bucket_size, interval_seconds=900, max_candles=200),
+            60: FootprintChart(bucket_size=bucket_size, interval_seconds=3600, max_candles=200),
+            240: FootprintChart(bucket_size=bucket_size, interval_seconds=14400, max_candles=200),
+            1440: FootprintChart(bucket_size=bucket_size, interval_seconds=86400, max_candles=200),
         }
         self.default_window = 5
         self.min_volume_btc = min_volume_btc
