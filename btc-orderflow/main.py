@@ -125,8 +125,8 @@ async def main() -> None:
     # Uvicorn server
     uvicorn_config = uvicorn.Config(
         app,
-        host="0.0.0.0",
-        port=8000,
+        host=config.server.host,
+        port=config.server.port,
         log_level="warning",
         access_log=False,
     )
@@ -136,14 +136,14 @@ async def main() -> None:
         server.serve(), name="server"
     )
 
-    logger.info("server_started", url="http://localhost:8000")
+    logger.info("server_started", host=config.server.host, port=config.server.port)
     if dev_mode:
         logger.info("dev_mode_active", frontend_url="http://localhost:5173")
     else:
-        logger.info("production_mode", frontend_served="http://localhost:8000")
+        logger.info("production_mode", url=f"http://{config.server.host}:{config.server.port}")
     logger.info(
         "ws_endpoint",
-        url="ws://localhost:8000/ws/footprint",
+        url=f"ws://{config.server.host}:{config.server.port}/ws/footprint",
     )
 
     # ── Shutdown Handler ─────────────────────────────────────

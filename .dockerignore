@@ -1,0 +1,37 @@
+# Git
+.git
+.github
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Frontend
+btc-orderflow/frontend/node_modules/
+btc-orderflow/frontend/dist/
+.eslintcache
+
+# Project
+docs/
+.qoder/
+LICENSE
+README.md
+task.md
+implementation_plan.md
+walkthrough.md
+
+# Config
+.env
+*.local

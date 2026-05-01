@@ -12,7 +12,15 @@ import { aggregateCandles } from './utils/aggregateCandles';
 import { perfMonitor } from './utils/perfMonitor';
 
 // Connect to the FastAPI WebSocket broadcast
-const WS_URL_BASE = 'ws://127.0.0.1:8000/ws/footprint';
+// Dynamic WebSocket URL detection
+const getWsUrl = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    // For local development: if frontend is on 5173, assume backend is on 8000
+    const wsHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
+    return `${protocol}//${wsHost}/ws/footprint`;
+};
+const WS_URL_BASE = getWsUrl();
 
 const CELL_HEIGHT = 24;
 const CELL_WIDTH = 140;
