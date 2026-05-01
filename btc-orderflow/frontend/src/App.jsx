@@ -1,18 +1,26 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useFootprint } from './hooks/useFootprint';
 import { Header } from './components/Header';
 import { FootprintTable } from './components/FootprintTable';
+import { FootprintCanvas } from './components/FootprintCanvas';
 import { InteractiveViewport } from './components/InteractiveViewport';
 import { PriceScale } from './components/PriceScale';
 import { DeltaPane } from './components/DeltaPane';
 import { snapTick } from './utils/tickSteps';
 import { binCeilPrice, binFloorPrice, binRoundPrice, unbinPrice } from './utils/priceBinning';
+import { aggregateCandles } from './utils/aggregateCandles';
+import { perfMonitor } from './utils/perfMonitor';
 
 // Connect to the FastAPI WebSocket broadcast
-// In dev mode, use the Vite proxy; in production, use the direct backend URL
-const WS_URL = import.meta.env.DEV 
-  ? 'ws://localhost:5173/ws/footprint'  // Vite dev server with proxy
-  : 'ws://localhost:8000/ws/footprint'; // Direct backend connection
+// Dynamic WebSocket URL detection
+const getWsUrl = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    // For local development: if frontend is on 5173, assume backend is on 8000
+    const wsHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
+    return `${protocol}//${wsHost}/ws/footprint`;
+};
+const WS_URL_BASE = getWsUrl();
 
 const CELL_HEIGHT = 24;
 const CELL_WIDTH = 140;
@@ -26,10 +34,28 @@ function App() {
     setAutoFit(false);
   }, []);
 
-  const { state, isConnected } = useFootprint(WS_URL);
-
-  // Tick Size in USD (Semantic Scale)
   const [tickSize, setTickSize] = useState(1.0);
+  const [autoFit, setAutoFit] = useState(true);
+  const [renderMode, setRenderMode] = useState('dom');
+  const [timeframeWindow, setTimeframeWindow] = useState(5);
+  const [showBadges, setShowBadges] = useState(true);
+
+  // Hook handles connection and data pruning behind the scenes
+  // Returns a mutable ref containing the latest parsed JSON (to avoid render spam)
+  const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
+  const { latestDataRef, status } = useFootprint(wsUrl);
+  
+  // Processed data for rendering - updated via rAF loop
+  const [chartData, setChartData] = useState({
+    candles: [],
+    last_price: 0,
+    window_sec: 300,
+    total_trades: 0,
+    total_candles: 0,
+    active_buckets: 0,
+    exchanges: []
+  });
+
   const setTickSizeSnapped = useCallback(
     (rawTick) => setTickSize(snapTick(Number(rawTick), 'nearest')),
     []
@@ -39,12 +65,66 @@ function App() {
   const [transform, setTransform] = useState({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [userHasPanned, setUserHasPanned] = useState(false);
+  
+  // CRITICAL: requestAnimationFrame render loop (Guide Section 5.3)
+  // Reads from latestDataRef and updates chartData state in batch
+  useEffect(() => {
+    let animFrameId;
+    
+    function renderLoop() {
+      // Track frame rate (Guide Section 8)
+      perfMonitor.tick();
+      
+      const newData = latestDataRef.current;
+      if (newData) {
+        // Consume data from ref and update state ONCE per frame
+        setChartData({
+          candles: newData.candles,
+          last_price: newData.last_price,
+          window_sec: newData.window_sec,
+          total_trades: newData.total_trades,
+          total_candles: newData.total_candles,
+          active_buckets: newData.active_buckets,
+          exchanges: newData.exchanges
+        });
+        // Clear ref to prevent redundant updates
+        latestDataRef.current = null;
+      }
+      animFrameId = requestAnimationFrame(renderLoop);
+    }
+    
+    // Start the render loop
+    animFrameId = requestAnimationFrame(renderLoop);
+    
+    // Cleanup on unmount
+    return () => cancelAnimationFrame(animFrameId);
+  }, [latestDataRef]);
 
-  // Auto-fit mode - when ON, chart auto-sizes to fit all candles
-  const [autoFit, setAutoFit] = useState(false);
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Press 'R' to toggle render mode (DOM vs Canvas)
+      if (e.key === 'r' || e.key === 'R') {
+        setRenderMode(prev => prev === 'dom' ? 'canvas' : 'dom');
+        console.log(`[App] Render mode: ${renderMode === 'dom' ? 'canvas' : 'dom'}`);
+      }
+      
+      // Press 'P' to log performance report
+      if (e.key === 'p' || e.key === 'P') {
+        perfMonitor.logReport();
+      }
+      // Press 'B' to toggle badges
+      if (e.key === 'b' || e.key === 'B') {
+        setShowBadges(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [renderMode]);
 
   const orderedCandles = useMemo(() => {
-    const candles = state.candles || [];
+    const candles = chartData.candles || [];
     if (candles.length < 2) return candles;
     const first = candles[0];
     const last = candles[candles.length - 1];
@@ -54,7 +134,11 @@ function App() {
       return [...candles].reverse();
     }
     return candles;
-  }, [state.candles]);
+  }, [chartData.candles]);
+
+  const { aggCandles, maxVolumeGlobal } = useMemo(() => {
+    return aggregateCandles(orderedCandles, tickSize);
+  }, [orderedCandles, tickSize]);
 
   // Compute the global price ladder across all visible candles.
   // Uses integer binning to avoid float/index drift across devices.
@@ -74,18 +158,20 @@ function App() {
       }
     });
 
-    if (typeof state.last_price === 'number' && state.last_price > 0) {
-      uniqueBins.add(binFloorPrice(state.last_price, tickSize));
+    if (typeof chartData.last_price === 'number' && chartData.last_price > 0) {
+      uniqueBins.add(binFloorPrice(chartData.last_price, tickSize));
     }
 
     if (uniqueBins.size === 0) return { prices: [], minBin: 0, maxBin: -1 };
 
-    const maxBin = Math.max(...Array.from(uniqueBins));
-    const minBin = Math.min(...Array.from(uniqueBins));
+    // Pad the top and bottom with 200 bins allowing infinite scroll into empty space
+    const PADDING_BINS = 200;
+    const maxBin = Math.max(...Array.from(uniqueBins)) + PADDING_BINS;
+    const minBin = Math.min(...Array.from(uniqueBins)) - PADDING_BINS;
 
     const binsCount = maxBin - minBin + 1;
     if (binsCount <= 0) return { prices: [], minBin: 0, maxBin: -1 };
-    if (binsCount > 6000) {
+    if (binsCount > 10000) {
       // Safety cap: prevents pathological tickSize values from creating huge DOM.
       // (Auto-fit + snapping should make this unlikely.)
       return { prices: [], minBin: 0, maxBin: -1 };
@@ -97,7 +183,7 @@ function App() {
     }
 
     return { prices, minBin, maxBin };
-  }, [orderedCandles, state.last_price, tickSize]);
+  }, [orderedCandles, chartData.last_price, tickSize]);
 
   const prices = priceLadder.prices;
 
@@ -131,14 +217,14 @@ function App() {
 
   const autoCenterY = useMemo(() => {
     if (prices.length === 0 || viewportSize.height <= 0) return 0;
-    const currentBin = typeof state.last_price === 'number' && state.last_price > 0 ? binFloorPrice(state.last_price, tickSize) : null;
+    const currentBin = typeof chartData.last_price === 'number' && chartData.last_price > 0 ? binFloorPrice(chartData.last_price, tickSize) : null;
     const targetBin = autoFit && fitCenterBin !== null ? fitCenterBin : currentBin;
     if (targetBin === null) return 0;
     if (targetBin < priceLadder.minBin || targetBin > priceLadder.maxBin) return 0;
     const priceIndex = priceLadder.maxBin - targetBin;
     const priceY = HEADER_HEIGHT + priceIndex * CELL_HEIGHT + CELL_HEIGHT / 2;
     return viewportSize.height / 2 - priceY;
-  }, [autoFit, fitCenterBin, state.last_price, prices, tickSize, viewportSize.height, priceLadder.minBin, priceLadder.maxBin]);
+  }, [autoFit, fitCenterBin, chartData.last_price, prices, tickSize, viewportSize.height, priceLadder.minBin, priceLadder.maxBin]);
 
   useEffect(() => {
     if (!autoFit || userHasPanned) return;
@@ -177,9 +263,9 @@ function App() {
   }, []);
 
   const currentPriceLine = useMemo(() => {
-    if (typeof state.last_price !== 'number' || prices.length === 0 || orderedCandles.length === 0) return null;
+    if (typeof chartData.last_price !== 'number' || prices.length === 0 || orderedCandles.length === 0) return null;
     if (viewportSize.width <= 0 || viewportSize.height <= 0) return null;
-    const currentBin = state.last_price > 0 ? binFloorPrice(state.last_price, tickSize) : null;
+    const currentBin = chartData.last_price > 0 ? binFloorPrice(chartData.last_price, tickSize) : null;
     if (currentBin === null || currentBin < priceLadder.minBin || currentBin > priceLadder.maxBin) return null;
     const priceIndex = priceLadder.maxBin - currentBin;
     const y = transform.y + (HEADER_HEIGHT + (priceIndex + 0.5) * CELL_HEIGHT) * transform.scaleY;
@@ -190,18 +276,22 @@ function App() {
     const width = Math.max(0, viewportSize.width - startX);
     if (width <= 0) return null;
     return { top: y, left: startX, width };
-  }, [state.last_price, prices, orderedCandles.length, viewportSize.width, viewportSize.height, tickSize, transform, priceLadder.minBin, priceLadder.maxBin]);
+  }, [chartData.last_price, prices, orderedCandles.length, viewportSize.width, viewportSize.height, tickSize, transform, priceLadder.minBin, priceLadder.maxBin]);
 
   return (
     <div className="dashboard">
-      <Header
-        state={state}
-        isConnected={isConnected}
-        tickSize={tickSize}
-        setTickSize={setTickSizeSnapped}
-        autoFit={autoFit}
-        onAutoFitToggle={handleAutoFitToggle}
-      />
+        <Header
+          state={chartData}
+          status={status}
+          tickSize={tickSize}
+          setTickSize={setTickSizeSnapped}
+          autoFit={autoFit}
+          onAutoFitToggle={handleAutoFitToggle}
+          timeframeWindow={timeframeWindow}
+          setTimeframeWindow={setTimeframeWindow}
+          showBadges={showBadges}
+          setShowBadges={setShowBadges}
+        />
 
       <div className="main-viewport-wrapper">
         <div className="chart-area">
@@ -211,13 +301,31 @@ function App() {
             onResize={setViewportSize}
             onUserPan={handleViewportUserInteract}
           >
-            <FootprintTable
+            {renderMode === 'canvas' ? null : (
+              <FootprintTable 
+                candles={orderedCandles}
+                aggCandles={aggCandles}
+                maxVolumeGlobal={maxVolumeGlobal}
+                prices={prices}
+                tickSize={tickSize}
+                lastPrice={chartData.last_price}
+                showBadges={showBadges}
+              />
+            )}
+          </InteractiveViewport>
+          
+          {/* Canvas overlay - sits ON TOP of viewport, not inside transformed content */}
+          {renderMode === 'canvas' && (
+            <FootprintCanvas
               candles={orderedCandles}
+              aggCandles={aggCandles}
               prices={prices}
               tickSize={tickSize}
-              lastPrice={state.last_price}
+              lastPrice={chartData.last_price}
+              transform={transform}
+              showBadges={showBadges}
             />
-          </InteractiveViewport>
+          )}
           {currentPriceLine && (
             <div
               className="current-price-segment"
@@ -234,7 +342,7 @@ function App() {
           <PriceScale
             prices={prices}
             tickSize={tickSize}
-            lastPrice={state.last_price}
+            lastPrice={chartData.last_price}
             transformY={transform.y}
             scaleY={transform.scaleY}
             onScaleDrag={handleScaleDrag}
@@ -251,6 +359,25 @@ function App() {
           scaleX={transform.scaleX}
         />
       </div>
+
+      {/* Loading overlay for initial data */}
+      {prices.length === 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'var(--text-secondary)',
+          textAlign: 'center',
+          background: 'var(--bg-elevated)',
+          padding: '24px',
+          borderRadius: '12px',
+          zIndex: 1000
+        }}>
+          <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Waiting for Market Data...</div>
+          <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>OKX Terminal connected. Latching onto live BTC tape.</div>
+        </div>
+      )}
     </div>
   );
 }

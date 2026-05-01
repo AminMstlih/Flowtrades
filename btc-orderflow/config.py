@@ -7,6 +7,7 @@ Fails loudly on invalid config — constraint #9.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -125,7 +126,17 @@ def load_config(config_path: Path | None = None) -> AppConfig:
         raw = tomllib.load(f)
 
     try:
-        config = AppConfig(**raw)
+        # Load initially from TOML
+        config_dict = AppConfig(**raw).model_dump()
+        
+        # Override with environment variables for Railway/Production
+        # Priority: ENV > TOML > Default
+        if "PORT" in os.environ:
+            config_dict["server"]["port"] = int(os.environ["PORT"])
+        if "HOST" in os.environ:
+            config_dict["server"]["host"] = os.environ["HOST"]
+            
+        config = AppConfig(**config_dict)
     except Exception as e:
         print(f"[FATAL] Config validation failed: {e}", file=sys.stderr)
         sys.exit(1)

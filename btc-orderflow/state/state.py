@@ -36,12 +36,15 @@ class FootprintState:
         absorption_vol_percentile: float = 80.0,
         absorption_price_pct: float = 0.05,
     ) -> None:
-        # window_seconds becomes the candle interval
-        self.chart = FootprintChart(
-            bucket_size=bucket_size, 
-            interval_seconds=window_seconds,
-            max_candles=50
-        )
+        self.charts = {
+            1: FootprintChart(bucket_size=bucket_size, interval_seconds=60, max_candles=200),
+            5: FootprintChart(bucket_size=bucket_size, interval_seconds=300, max_candles=200),
+            15: FootprintChart(bucket_size=bucket_size, interval_seconds=900, max_candles=200),
+            60: FootprintChart(bucket_size=bucket_size, interval_seconds=3600, max_candles=200),
+            240: FootprintChart(bucket_size=bucket_size, interval_seconds=14400, max_candles=200),
+            1440: FootprintChart(bucket_size=bucket_size, interval_seconds=86400, max_candles=200),
+        }
+        self.default_window = 5
         self.min_volume_btc = min_volume_btc
         
         # Detection engine for pattern recognition
@@ -63,54 +66,48 @@ class FootprintState:
         """
         now_ms = trade.timestamp
 
-        # Add trade to footprint chart (handles candle rollover automatically)
-        self.chart.add_trade(
-            ts_ms=now_ms,
-            price=trade.price,
-            volume=trade.volume,
-            side=trade.side
-        )
+        # Add trade to all footprint charts (handles candle rollover automatically)
+        for chart in self.charts.values():
+            chart.add_trade(
+                ts_ms=now_ms,
+                price=trade.price,
+                volume=trade.volume,
+                side=trade.side
+            )
 
         # Bookkeeping
         self._trade_count += 1
         self._last_trade_time = now_ms
         self._last_price = trade.price
 
-    def get_display_state(self) -> list[FootprintCandle]:
+    def get_display_state(self, window_minutes: int = 5) -> list[FootprintCandle]:
         """
         Get the array of structural candles for the frontend.
         """
-        return self.chart.get_snapshot()
+        chart = self.charts.get(window_minutes, self.charts[self.default_window])
+        return chart.get_snapshot()
 
     def set_window(self, window_minutes: int) -> None:
         """
         Change the candle timeframe interval.
-        Note: True historical reconstruction requires a database replay.
-        For this MVP, we just wipe the chart and start fresh on the new interval.
+        Deprecated: Used implicitly by client requests now.
         """
-        window_seconds = window_minutes * 60
-        old_size = self.chart.bucket_size
-        self.chart = FootprintChart(
-            bucket_size=old_size,
-            interval_seconds=window_seconds,
-            max_candles=50
-        )
-        self._trade_count = 0
-        logger.info(
-            "timeframe_changed_chart_reset",
-            new_interval_minutes=window_minutes,
-        )
+        pass
 
-    @property
-    def stats(self) -> dict:
-        candles = self.chart.get_snapshot()
+    def get_stats(self, window_minutes: int = 5) -> dict:
+        chart = self.charts.get(window_minutes, self.charts[self.default_window])
+        candles = chart.get_snapshot()
         active_buckets_total = sum(len(c.buckets) for c in candles)
         
         return {
             "total_trades_processed": self._trade_count,
             "active_buckets": active_buckets_total,
             "total_candles": len(candles),
-            "window_seconds": self.chart.interval_ms // 1000,
+            "window_seconds": chart.interval_ms // 1000,
             "last_price": self._last_price,
             "last_trade_time": self._last_trade_time,
         }
+    
+    @property
+    def stats(self) -> dict:
+        return self.get_stats()

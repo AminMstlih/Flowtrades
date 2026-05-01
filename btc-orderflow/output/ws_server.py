@@ -66,7 +66,7 @@ def create_app(
         }
 
     @app.websocket("/ws/footprint")
-    async def footprint_ws(ws: WebSocket):
+    async def footprint_ws(ws: WebSocket, window: int = 5):
         await ws.accept()
         connected_clients.append(ws)
         client_id = id(ws)
@@ -80,7 +80,7 @@ def create_app(
         try:
             while True:
                 # Serialize current state
-                payload = serialize_state(state, num_rows, enabled_exchanges)
+                payload = serialize_state(state, num_rows, enabled_exchanges, window)
                 payload_json = json.dumps(payload)
 
                 # Send with timeout — drop slow clients to prevent OOM

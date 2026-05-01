@@ -37,7 +37,7 @@ Exchange APIs → Normalization → Trade Bus → Aggregation → FastAPI Server
                                                     ↕
                                               WebSocket Broadcast
 ```
-
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/48de52bd-41ac-45de-8198-2c8006c16ef4" />
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/4accfa67-04a7-424e-928d-9574127f7a88" />
 <img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/e1bbe359-7be9-45cc-9012-84626569c08a" />
 <img width="768" height="1676" alt="image" src="https://github.com/user-attachments/assets/4ed187f8-92c2-4141-9e00-1bc6df3e57b6" />
@@ -78,11 +78,11 @@ Flowtrades shows you the **raw executed trades** — who is buying, who is selli
 | Live candlestick chart | ✅ Working |
 | Real-time buy / sell volume per price level | ✅ Working |
 | Delta (buy pressure − sell pressure) | ✅ Working |
-| WebSocket connection to Binance | ✅ Working |
-| Footprint ladder display | 🔨 In progress |
-| Imbalance detection & highlighting | 🔨 In progress |
-| OKX + Bybit multi-exchange merge | 📋 Planned |
-| Absorption & exhaustion detection | 📋 Planned |
+| Footprint ladder display (DOM & Canvas) | ✅ Working |
+| OKX + Bybit multi-exchange connectivity | ✅ Working |
+| Imbalance detection & highlighting | ✅ Working |
+| Absorption & exhaustion detection | ✅ Working |
+| User UI toggles (Badges, Rendering) | ✅ Working |
 | Mobile-responsive web dashboard | 📋 Planned |
 
 ---
@@ -156,6 +156,18 @@ Access: http://localhost:8000
 
 > ⚠️ **Note:** This project is actively being built. Expect rough edges. If something breaks, open an issue.
 
+### Exchange Configuration
+By default, the application is pre-configured to use **OKX** as the primary data source. This is recommended for users in regions (like Indonesia) where Binance IP restrictions (`HTTP 403`) are common.
+
+To edit your exchange sources:
+1. Open `config.toml` in the root directory.
+2. Locate the `[exchanges]` section.
+3. Update the `enabled` list:
+   ```toml
+   [exchanges]
+   enabled = ["okx", "bybit", "binance"]
+   ```
+
 ---
 
 ## Project Structure
@@ -194,15 +206,14 @@ Price     | Buy Vol  | Sell Vol | Delta     | Imbalance
 
 ---
 
-## Roadmap
-
-- [x] Binance WebSocket trade stream
+- [x] Binance + OKX + Bybit WebSocket support
 - [x] Real-time candlestick chart
 - [x] Buy/sell volume aggregation per price level
 - [x] Delta calculation
-- [ ] Imbalance detection with threshold highlighting
-- [ ] Absorption & exhaustion pattern detection
-- [ ] OKX + Bybit integration (multi-exchange merged view)
+- [x] Imbalance detection with threshold highlighting
+- [x] Absorption & exhaustion pattern detection
+- [x] Multi-exchange merged view (OKX/Bybit)
+- [x] User-controlled toggle for detection badges
 - [ ] Mobile-responsive web dashboard
 - [ ] Educational tooltips explaining each pattern
 - [ ] Historical replay mode

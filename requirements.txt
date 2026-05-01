@@ -1,0 +1,5 @@
+structlog
+uvicorn
+pydantic
+websockets
+fastapi

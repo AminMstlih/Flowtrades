@@ -16,6 +16,7 @@ def serialize_state(
     state: FootprintState,
     num_rows: int = 20,
     enabled_exchanges: list[str] | None = None,
+    window: int = 5,
 ) -> dict:
     """
     Serialize current footprint state to a JSON-serializable dict.
@@ -26,9 +27,10 @@ def serialize_state(
         state: The footprint state to serialize.
         num_rows: Maximum number of candles to include in output.
                   Prevents unbounded payload growth.
+        window: The timeframe window in minutes.
     """
-    stats = state.stats
-    all_candles = state.get_display_state()
+    stats = state.get_stats(window)
+    all_candles = state.get_display_state(window_minutes=window)
     
     # Truncate to num_rows — always include the most recent candles
     # This is critical: without truncation, high-volume periods

@@ -1,11 +1,34 @@
 :root {
-  --bg-dark: #0a0b0d;
-  --bg-panel: #131722;
-  --text-primary: #d1d4dc;
-  --text-secondary: #787b86;
-  --buy-green: #00e676;
-  --sell-red: #ff1744;
-  --accent-orange: #ff9800;
+  /* Guide Section 10: Visual Theme Specification */
+  --bg-primary: #0D1B2A;
+  --bg-secondary: #111F2E;
+  --bg-elevated: #162436;
+  --bg-row-alt: #0A1520;
+
+  --text-primary: #E0E7EF;
+  --text-secondary: #8FA8BE;
+  --text-muted: #4A6A82;
+
+  --accent-buy: #26A69A;
+  --accent-sell: #EF5350;
+  --accent-neutral: #546E7A;
+  --accent-flag: #F9A825;
+  --accent-blue: #1565C0;
+
+  --border-subtle: #1E3448;
+  --border-strong: #2E5070;
+
+  --candle-up: #26A69A;
+  --candle-down: #EF5350;
+  --crosshair: #8FA8BE;
+  --current-price: #F9A825;
+
+  /* Legacy compatibility */
+  --bg-dark: #0D1B2A;
+  --bg-panel: #111F2E;
+  --buy-green: #26A69A;
+  --sell-red: #EF5350;
+  --accent-orange: #F9A825;
   --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
   --cell-h: 24px;
 }
@@ -17,16 +40,24 @@
 }
 
 body {
-  background-color: var(--bg-dark);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
+  /* Guide Section 4.5: Prevent elastic bounce on iOS */
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
 .dashboard {
   display: flex;
   flex-direction: column;
+  /* Guide Section 2.4: Use 100dvh NOT 100vh for mobile */
   height: 100vh;
+  /* Fallback for older browsers */
+  height: 100dvh;
+  /* Modern browsers - handles mobile browser chrome */
 }
 
 /* ── VIEWPORT LAYOUT ────────────────────────────────── */
@@ -45,13 +76,15 @@ body {
   position: relative;
   overflow: hidden;
   cursor: grab;
+  /* Guide Section 4.4: Prevent browser default touch behavior */
+  touch-action: none;
 }
 
 .price-axis-sidebar {
   width: 100px;
   /* Wider for precision */
-  background-color: var(--bg-panel);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-subtle);
   position: relative;
   z-index: 20;
   user-select: none;
@@ -83,7 +116,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 12px;
+  padding-right: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -1001,5 +1034,231 @@ body {
 
   .tick-value {
     font-size: 0.6rem;
+  }
+}
+
+/* ========================================
+   TOUCH TARGET SIZING
+   Guide Section 4.3: Minimum 44x44px touch targets
+   ======================================== */
+
+@media (max-width: 767px) {
+
+  /* All interactive elements need minimum 44x44px touch area */
+  button,
+  select,
+  .auto-fit-badge,
+  .status-badge,
+  .timeframe-button,
+  .exchange-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  /* Ensure clickable areas are large enough */
+  .header button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ========================================
+   RESPONSIVE BREAKPOINTS
+   Guide Section 2.1 & 2.2: Mobile-first CSS
+   ======================================== */
+
+/* xs (mobile): 320px+ */
+@media (max-width: 479px) {
+  .header {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 0.9rem;
+  }
+
+  .header-left {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .exchange-list {
+    font-size: 0.65rem;
+  }
+
+  .header-center {
+    display: none;
+    /* Hide large price on mobile */
+  }
+
+  .header-right {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .controls-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .stats-row {
+    font-size: 0.65rem;
+  }
+
+  .control-group {
+    min-width: 44px;
+    /* Guide Section 4.3: Touch target */
+  }
+
+  .control-group select {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px;
+  }
+
+  .auto-fit-badge {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .status-badge {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Chart fills most of screen on mobile */
+  .main-viewport-wrapper {
+    flex-direction: column;
+  }
+
+  .price-axis-sidebar {
+    width: 70px;
+    /* Narrower on mobile */
+  }
+
+  .fixed-bottom-panels {
+    max-height: 30vh;
+  }
+}
+
+/* sm (phablet): 480px+ */
+@media (min-width: 480px) and (max-width: 767px) {
+  .header {
+    padding: 10px;
+  }
+
+  .title {
+    font-size: 1rem;
+  }
+
+  .header-center {
+    display: flex;
+  }
+
+  .live-price {
+    font-size: 1.1rem;
+  }
+
+  .main-viewport-wrapper {
+    flex-direction: column;
+  }
+
+  .price-axis-sidebar {
+    width: 80px;
+  }
+}
+
+/* md (tablet): 768px+ */
+@media (min-width: 768px) {
+  .header {
+    padding: 12px 16px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+  }
+
+  .exchange-list {
+    font-size: 0.75rem;
+  }
+}
+
+/* lg (desktop): 1024px+ */
+@media (min-width: 1024px) {
+  .header {
+    padding: 12px 24px;
+  }
+
+  .title {
+    font-size: 1.2rem;
+  }
+
+  .live-price {
+    font-size: 1.4rem;
+  }
+
+  .control-group select {
+    padding: 6px 12px;
+  }
+
+  .stats-row {
+    font-size: 0.75rem;
+  }
+}
+
+/* xl (wide): 1280px+ */
+@media (min-width: 1280px) {
+  .header {
+    padding: 12px 32px;
+  }
+
+  .title {
+    font-size: 1.3rem;
+  }
+
+  .live-price {
+    font-size: 1.5rem;
+  }
+}
+
+/* 2xl (4K): 2560px+ */
+@media (min-width: 2560px) {
+  .header {
+    padding: 16px 48px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .live-price {
+    font-size: 1.8rem;
+  }
+
+  .control-group label {
+    font-size: 1rem;
+  }
+
+  .control-group select {
+    font-size: 1rem;
+    padding: 10px 16px;
+  }
+
+  .stats-row {
+    font-size: 0.9rem;
+  }
+
+  .price-axis-sidebar {
+    width: 120px;
+    /* Wider for 4K */
+  }
+
+  .price-tick {
+    font-size: 0.85rem;
   }
 }

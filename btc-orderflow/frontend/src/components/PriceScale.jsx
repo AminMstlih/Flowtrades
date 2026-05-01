@@ -35,9 +35,11 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
   const currentPriceBinned = lastPrice !== null
     ? unbinPrice(binFloorPrice(lastPrice, tickSize), tickSize)
     : null;
-  const priceIndex = prices.indexOf(currentPriceBinned);
-  const decimals = getTickDecimals(tickSize);
   const epsilon = tickSize / 1000;
+  const priceIndex = currentPriceBinned !== null
+    ? prices.findIndex(p => Math.abs(p - currentPriceBinned) <= epsilon)
+    : -1;
+  const decimals = getTickDecimals(tickSize);
 
   const liveLabelTop = useMemo(() => {
     if (priceIndex === -1) return null;
