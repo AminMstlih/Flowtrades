@@ -28,7 +28,7 @@ absorption_price_pct = 0.05
 
 [exchanges]
 # Which exchanges to connect to
-enabled = ["okx"]
+enabled = ["okx", "bybit", "binance"]
 
 [display]
 # Number of price levels to display simultaneously
