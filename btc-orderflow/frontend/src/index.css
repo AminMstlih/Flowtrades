@@ -920,8 +920,7 @@ body {
     position: absolute !important;
     top: 0 !important;
     width: 100% !important;
-    height: auto !important;
-    transform: none !important;
+    will-change: transform;
   }
 
   .price-tick {
