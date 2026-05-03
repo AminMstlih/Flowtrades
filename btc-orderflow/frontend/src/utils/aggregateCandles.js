@@ -17,7 +17,9 @@ export function aggregateCandles(candles, tickSize) {
 
     if (c.buckets) {
       c.buckets.forEach(b => {
-        const binnedPrice = unbinPrice(binFloorPrice(b.price, tickSize), tickSize);
+        const rawPrice = Number(b.price);
+        if (!Number.isFinite(rawPrice)) return;
+        const binnedPrice = unbinPrice(binFloorPrice(rawPrice, tickSize), tickSize);
         uniquePrices.add(binnedPrice);
 
         if (!aggregatedBuckets.has(binnedPrice)) {

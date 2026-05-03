@@ -11,7 +11,42 @@ export function getTickDecimals(tick) {
   const s = Number(tick).toString();
   if (!s.includes('.')) return 0;
   const parts = s.split('.');
-  return Math.min(6, parts[1].length);
+  return Math.min(8, parts[1].length);
+}
+
+export function getTickStepsForPrice(price) {
+  const p = Number(price);
+  if (!Number.isFinite(p) || p <= 0) return TICK_STEPS.slice();
+
+  const candidates = new Set();
+  const pctSteps = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01];
+  pctSteps.forEach((pct) => {
+    candidates.add(Number((p * pct).toFixed(8)));
+  });
+  TICK_STEPS.forEach((step) => candidates.add(step));
+
+  return Array.from(candidates)
+    .filter((step) => Number.isFinite(step) && step > 0)
+    .sort((a, b) => a - b);
+}
+
+export function getRecommendedTick(price) {
+  const steps = getTickStepsForPrice(price);
+  if (steps.length === 0) return 1;
+  const p = Number(price);
+  if (!Number.isFinite(p) || p <= 0) return steps[0];
+
+  const target = p * 0.0005;
+  let best = steps[0];
+  let bestDist = Math.abs(best - target);
+  for (const step of steps) {
+    const dist = Math.abs(step - target);
+    if (dist < bestDist) {
+      best = step;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 /**

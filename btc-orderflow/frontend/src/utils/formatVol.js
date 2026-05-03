@@ -13,3 +13,11 @@ export function formatVol(vol, showSign = false) {
   const str = Math.round(vol).toString();
   return showSign && vol > 0 ? "+" + str : str;
 }
+
+export function formatPriceLike(value, decimals = 2) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '';
+  return Number(value).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}

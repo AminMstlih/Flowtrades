@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { setupHiDPICanvas } from '../utils/canvas';
 import { formatVol } from '../utils/formatVol';
 import { binFloorPrice, unbinPrice } from '../utils/priceBinning';
+import { DETAIL_LEVEL, getCandleFootprintLayout, getDetailLevel, getSmoothFootprintWidth, shouldShowFootprint } from '../utils/uiGeometry';
 
 /**
  * Canvas-based Footprint rendering component.
@@ -26,7 +27,8 @@ export function FootprintCanvas({
   tickSize = 1.0, 
   lastPrice = null,
   transform = { x: 0, y: 0, scaleX: 1, scaleY: 1 },
-  showBadges = true
+  showBadges = true,
+  priceDecimals = 2
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -42,12 +44,32 @@ export function FootprintCanvas({
     currentPriceBg: '#1A2A3A',
     rowBgDark: '#0D1B2A',
     rowBgLight: '#111F2E',
-    pocBorder: '#F9A825',
+    grid: 'rgba(143, 168, 190, 0.08)',
+    gridStrong: 'rgba(143, 168, 190, 0.16)',
   };
 
   const ROW_HEIGHT = 24; // Logical pixels
   const HEADER_HEIGHT = 32; // Offset for DOM Table header
   const priceEps = tickSize / 1000;
+  const visibleCandles = Math.max(candles.length, 1);
+  const viewportWidth = sizeRef.current.width || 0;
+  const widthPerCandle = viewportWidth > 0
+    ? viewportWidth / Math.max(visibleCandles + 1, 6)
+    : 140;
+  const candleWidth = Math.max(42, Math.min(120, widthPerCandle * Math.max(0.85, transform.scaleX)));
+  const detailLevel = getDetailLevel({
+    candleWidth,
+    visibleCandles: candles.length,
+    viewportWidth,
+  });
+  const smoothFootprintWidth = getSmoothFootprintWidth({
+    candleWidth,
+    visibleCandles: candles.length,
+    viewportWidth,
+  });
+  const footprintLayout = getCandleFootprintLayout({ candleWidth, detailLevel });
+  const compactMode = detailLevel === DETAIL_LEVEL.COMPACT;
+  const hideFootprint = !shouldShowFootprint(detailLevel);
 
   // Initialize canvas with HiDPI support
   useEffect(() => {
@@ -144,10 +166,61 @@ export function FootprintCanvas({
       : null;
 
     // Column positions
-    const colWidth = 140; // Matched exactly to CELL_WIDTH in App.jsx
-    const priceColWidth = 80;
+    const colWidth = candleWidth;
     const totalCols = candles.length;
-    const tableWidth = priceColWidth + (totalCols * colWidth);
+    const tableWidth = totalCols * colWidth;
+
+    const maxPrice = prices[0];
+    const minPrice = prices[prices.length - 1];
+    const rowCount = prices.length;
+
+    const maxVol = Math.max(
+      ...aggCandles.flatMap((c) => c.aggBuckets?.map((b) => b.buy_vol + b.sell_vol) || [0]),
+      1,
+    );
+
+    const priceToRowIndex = (price) => {
+      if (typeof price !== 'number') return null;
+      if (price > maxPrice + priceEps || price < minPrice - priceEps) return null;
+      const idx = Math.round((maxPrice - price) / tickSize);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= rowCount) return null;
+      return idx;
+    };
+
+    // Draw candle bodies/wicks once per candle (chart-like), not per price-row (grid-like)
+    aggCandles.forEach((candle, colIndex) => {
+      const x = colIndex * colWidth;
+      const laneWidth = Math.max(1, Math.min(colWidth, smoothFootprintWidth || footprintLayout.footprintWidth));
+      const laneLeft = x + Math.max(2, (colWidth - laneWidth) / 2);
+      const centerX = laneLeft + laneWidth / 2;
+
+      const hiIdx = priceToRowIndex(candle.high);
+      const loIdx = priceToRowIndex(candle.low);
+      const openIdx = priceToRowIndex(candle.open);
+      const closeIdx = priceToRowIndex(candle.close);
+      if (hiIdx === null || loIdx === null || openIdx === null || closeIdx === null) return;
+
+      const yHigh = HEADER_HEIGHT + (hiIdx + 0.5) * ROW_HEIGHT;
+      const yLow = HEADER_HEIGHT + (loIdx + 0.5) * ROW_HEIGHT;
+      const yOpen = HEADER_HEIGHT + (openIdx + 0.5) * ROW_HEIGHT;
+      const yClose = HEADER_HEIGHT + (closeIdx + 0.5) * ROW_HEIGHT;
+
+      const isUp = candle.close >= candle.open;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyBottom = Math.max(yOpen, yClose);
+      const bodyHeight = Math.max(3, bodyBottom - bodyTop);
+      const bodyWidth = Math.max(3, Math.min(8, laneWidth * 0.18));
+
+      ctx.strokeStyle = isUp ? 'rgba(38, 166, 154, 0.55)' : 'rgba(239, 83, 80, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(centerX, yHigh);
+      ctx.lineTo(centerX, yLow);
+      ctx.stroke();
+
+      ctx.fillStyle = isUp ? 'rgba(38, 166, 154, 0.85)' : 'rgba(239, 83, 80, 0.85)';
+      ctx.fillRect(centerX - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+    });
 
     // Draw each price row
     prices.forEach((price, rowIndex) => {
@@ -161,21 +234,27 @@ export function FootprintCanvas({
       const isCurrentPriceRow = currentPriceBinned !== null && 
         Math.abs(price - currentPriceBinned) <= priceEps;
 
-      // Row background
-      ctx.fillStyle = isCurrentPriceRow ? colors.currentPriceBg : 
-        (rowIndex % 2 === 0 ? colors.rowBgDark : colors.rowBgLight);
-      ctx.fillRect(0, y, tableWidth, ROW_HEIGHT);
-
-      // Price label
-      ctx.fillStyle = isCurrentPriceRow ? '#FFFFFF' : '#8FA8BE';
-      ctx.font = 'bold 11px "JetBrains Mono", monospace';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(price.toFixed(1), priceColWidth - 8, y + ROW_HEIGHT / 2);
+      // Subtle row separator instead of strong table banding
+      ctx.fillStyle = isCurrentPriceRow ? colors.currentPriceBg : 'transparent';
+      if (isCurrentPriceRow) {
+        ctx.fillRect(0, y, tableWidth, ROW_HEIGHT);
+      }
+      // Reduce grid density to avoid the "table" feeling
+      const isMajor = rowIndex % 5 === 0;
+      const isMinor = rowIndex % 2 === 0;
+      if (isMajor || isMinor || isCurrentPriceRow) {
+        ctx.strokeStyle = isCurrentPriceRow ? colors.gridStrong : (isMajor ? colors.gridStrong : colors.grid);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, y + ROW_HEIGHT);
+        ctx.lineTo(tableWidth, y + ROW_HEIGHT);
+        ctx.stroke();
+      }
 
       // Draw cells for each candle
       aggCandles.forEach((candle, colIndex) => {
-        const x = priceColWidth + (colIndex * colWidth);
+        const x = colIndex * colWidth;
+        const isUp = candle.close >= candle.open;
         
         // Find bucket for this price
         const bucket = candle.aggBuckets?.find(b => 
@@ -183,75 +262,84 @@ export function FootprintCanvas({
         );
 
         if (!bucket) {
-          // Empty cell - draw OHLC line indicator
-          const isUp = candle.close >= candle.open;
-          const isBody = price <= Math.max(candle.open, candle.close) && 
-                        price >= Math.min(candle.open, candle.close);
-          const isWick = price <= candle.high && price >= candle.low;
-
-          if (isBody || isWick) {
-            ctx.fillStyle = isUp ? colors.buyVol : colors.sellVol;
-            ctx.fillRect(x + colWidth / 2 - 1, y + 4, 2, ROW_HEIGHT - 8);
-          }
           return;
         }
 
+        if (hideFootprint) {
+          return;
+        }
+
+        const buyVol = Number(bucket.buy_vol) || 0;
+        const sellVol = Number(bucket.sell_vol) || 0;
+        const delta = Number(bucket.delta) || 0;
+
         // Calculate volume opacity
-        const cellVol = bucket.buy_vol + bucket.sell_vol;
-        const maxVol = Math.max(...aggCandles.flatMap(c => 
-          c.aggBuckets?.map(b => b.buy_vol + b.sell_vol) || [0]
-        ), 1);
+        const cellVol = buyVol + sellVol;
         const opacity = Math.min(cellVol / maxVol, 1.0);
 
         // Background color based on delta
-        const isBuyDom = bucket.delta > 0;
-        ctx.fillStyle = isBuyDom 
-          ? `rgba(38, 166, 154, ${opacity * 0.4})`
-          : `rgba(239, 83, 80, ${opacity * 0.4})`;
-        ctx.fillRect(x, y, colWidth, ROW_HEIGHT);
+        const isBuyDom = delta > 0;
+        const laneWidth = Math.max(1, Math.min(colWidth, smoothFootprintWidth || footprintLayout.footprintWidth));
+        const laneLeft = x + Math.max(2, (colWidth - laneWidth) / 2);
 
-        // Sell volume (left)
+        if (footprintLayout.showBars) {
+          ctx.fillStyle = isBuyDom
+            ? `rgba(38, 166, 154, ${opacity * 0.35})`
+            : `rgba(239, 83, 80, ${opacity * 0.35})`;
+          ctx.fillRect(laneLeft, y, laneWidth, ROW_HEIGHT);
+        }
+
+        const leftBar = Math.max(1, Math.min(laneWidth * 0.48, (sellVol / maxVol) * laneWidth));
+        const rightBar = Math.max(1, Math.min(laneWidth * 0.48, (buyVol / maxVol) * laneWidth));
+
         ctx.fillStyle = colors.sellVol;
-        ctx.font = '11px "JetBrains Mono", monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(formatVol(bucket.sell_vol), x + 4, y + ROW_HEIGHT / 2);
+        ctx.fillRect(laneLeft + Math.max(1, (laneWidth / 2) - leftBar - 1), y + 4, leftBar, ROW_HEIGHT - 8);
 
-        // Buy volume (right)
         ctx.fillStyle = colors.buyVol;
-        ctx.textAlign = 'right';
-        ctx.fillText(formatVol(bucket.buy_vol), x + colWidth - 4, y + ROW_HEIGHT / 2);
+        ctx.fillRect(laneLeft + (laneWidth / 2) + 1, y + 4, rightBar, ROW_HEIGHT - 8);
+
+        if (footprintLayout.showNumbers) {
+          ctx.font = '12px "JetBrains Mono", monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = colors.sellVol;
+          ctx.fillText(formatVol(sellVol), laneLeft + 4, y + ROW_HEIGHT / 2);
+          ctx.textAlign = 'right';
+          ctx.fillStyle = colors.buyVol;
+          ctx.fillText(formatVol(buyVol), laneLeft + laneWidth - 4, y + ROW_HEIGHT / 2);
+        }
 
         // Imbalance highlight
         const hasBackendFlags = bucket.flags && bucket.flags.length > 0;
         const buyImb = hasBackendFlags
           ? bucket.flags.some(f => f.type === 'IMB' && f.direction === 'buy')
-          : bucket.buy_vol > (bucket.sell_vol * 3) && bucket.buy_vol > 0;
+          : buyVol > (sellVol * 3) && buyVol > 0;
         const sellImb = hasBackendFlags
           ? bucket.flags.some(f => f.type === 'IMB' && f.direction === 'sell')
-          : bucket.sell_vol > (bucket.buy_vol * 3) && bucket.sell_vol > 0;
+          : sellVol > (buyVol * 3) && sellVol > 0;
 
         if (buyImb || sellImb) {
           ctx.fillStyle = buyImb ? colors.buyImbalanceBg : colors.sellImbalanceBg;
-          ctx.fillRect(x, y, colWidth, ROW_HEIGHT);
-          
-          // Redraw text on top
-          ctx.fillStyle = buyImb ? colors.buyVol : colors.sellVol;
-          ctx.font = 'bold 11px "JetBrains Mono", monospace';
-          ctx.textAlign = 'left';
-          ctx.fillText(formatVol(bucket.sell_vol), x + 4, y + ROW_HEIGHT / 2);
-          ctx.fillStyle = buyImb ? colors.buyVol : colors.sellVol;
-          ctx.textAlign = 'right';
-          ctx.fillText(formatVol(bucket.buy_vol), x + colWidth - 4, y + ROW_HEIGHT / 2);
+          ctx.fillRect(laneLeft, y, laneWidth, ROW_HEIGHT);
+        }
+
+        if (footprintLayout.showBars) {
+          ctx.strokeStyle = isUp ? 'rgba(38, 166, 154, 0.18)' : 'rgba(239, 83, 80, 0.18)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(laneLeft, y + ROW_HEIGHT / 2);
+          ctx.lineTo(laneLeft + laneWidth, y + ROW_HEIGHT / 2);
+          ctx.stroke();
         }
 
         // Detection flags (non-IMB)
-        if (showBadges && hasBackendFlags) {
+        if (showBadges && hasBackendFlags && !compactMode) {
           const badges = bucket.flags.filter(f => f.type !== 'IMB');
           if (badges.length > 0) {
             ctx.fillStyle = colors.flagColor;
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '10px "JetBrains Mono", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(badges.map(f => f.type).join(' '), x + colWidth / 2, y + ROW_HEIGHT - 3);
+            ctx.fillText(badges.map(f => f.type).join(' '), laneLeft + laneWidth / 2, y + ROW_HEIGHT - 3);
           }
         }
       });

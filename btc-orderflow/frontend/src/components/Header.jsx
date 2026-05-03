@@ -1,20 +1,17 @@
 import React from 'react';
 import { TICK_STEPS, snapTick } from '../utils/tickSteps';
+import { formatPriceLike } from '../utils/formatVol';
 
-export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
+export function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
-  
+
   // Map status to display values
   const isConnected = status === 'connected';
-  const statusText = status === 'connected' ? 'LIVE' : 
-                     status === 'reconnecting' ? 'RECONNECTING' : 
-                     status === 'connecting' ? 'CONNECTING' : 'OFFLINE';
+  const statusText = status === 'connected' ? 'LIVE' :
+    status === 'reconnecting' ? 'RECONNECTING' :
+      status === 'connecting' ? 'CONNECTING' : 'OFFLINE';
 
-  const fmtPrice = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 1
-  }).format(last_price);
+  const fmtPrice = formatPriceLike(last_price, instrument?.priceDecimals ?? 2);
 
   const fmtTotal = new Intl.NumberFormat('en-US').format(total_trades);
   const fmtCandles = new Intl.NumberFormat('en-US').format(total_candles);
@@ -22,7 +19,7 @@ export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFi
   return (
     <div className="header">
       <div className="header-left">
-        <h1 className="title">⚡ BTC ORDER FLOW</h1>
+        <h1 className="title">⚡Flowtrades</h1>
         <div className="exchange-list">
           {exchanges?.length ? exchanges.join(' • ').toUpperCase() : 'WAITING FOR DATA...'}
         </div>
@@ -38,9 +35,12 @@ export function Header({ state, status, tickSize, setTickSize, autoFit, onAutoFi
             <label>Tick Size</label>
             <select
               value={tickSize}
-              onChange={(e) => setTickSize(snapTick(Number(e.target.value), 'nearest'))}
+              onChange={(e) => {
+                setTickMode?.('manual');
+                setTickSize(snapTick(Number(e.target.value), 'nearest'));
+              }}
             >
-              {TICK_STEPS.map((s) => (
+              {tickOptions.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

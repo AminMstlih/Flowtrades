@@ -18,33 +18,7 @@ export function InteractiveViewport({
   const rAFRef = useRef(null);
 
   const applyInertia = useCallback(() => {
-    const decay = 0.95; // Friction coefficient
-    const threshold = 0.5; // Stop when velocity is below this
-
-    let vx = velocityRef.current.x;
-    let vy = velocityRef.current.y;
-
-    if (Math.abs(vx) < threshold && Math.abs(vy) < threshold) {
-      rAFRef.current = null;
-      return;
-    }
-
-    // Apply current velocity
-    const { onTransformChange: onChange } = stateRef.current;
-    if (onChange) {
-      // Use functional update to avoid rAF race conditions with React state
-      onChange(prev => ({
-        ...prev,
-        x: prev.x + vx,
-        y: prev.y + vy
-      }));
-    }
-
-    // Decay velocity
-    velocityRef.current.x *= decay;
-    velocityRef.current.y *= decay;
-
-    rAFRef.current = requestAnimationFrame(applyInertia);
+    rAFRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -85,19 +59,7 @@ export function InteractiveViewport({
         }));
       },
       onPanEnd: () => {
-        const history = panHistoryRef.current;
-        if (history.length < 2) return;
-        
-        const first = history[0];
-        const last = history[history.length - 1];
-        const dt = last.time - first.time;
-        if (dt > 0 && dt < 150) { // Only apply momentum for fast flicks
-          const vx = (last.x - first.x) / dt * 16; // pixels per frame (approx 60fps)
-          const vy = (last.y - first.y) / dt * 16;
-          
-          velocityRef.current = { x: vx, y: vy };
-          rAFRef.current = requestAnimationFrame(applyInertia);
-        }
+        velocityRef.current = { x: 0, y: 0 };
       },
       onZoom: (scaleFactor, midpoint) => {
         const { onTransformChange: onChange, onUserPan: onPan } = stateRef.current;

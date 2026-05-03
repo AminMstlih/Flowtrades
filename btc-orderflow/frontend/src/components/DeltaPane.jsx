@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { formatVol } from '../utils/formatVol';
 
-export function DeltaPane({ candles, scrollX = 0, scaleX = 1 }) {
+export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 }) {
     const { deltas, maxDelta } = useMemo(() => {
         if (!candles || candles.length === 0) {
             return { deltas: [], maxDelta: 1 };
@@ -22,6 +22,8 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1 }) {
 
     if (deltas.length === 0) return null;
 
+    const cellWidth = Math.max(48, Math.min(132, 140 * Math.max(0.75, scaleX)));
+
     return (
         <div className="delta-pane">
             <div className="delta-pane-label">DELTA</div>
@@ -40,7 +42,7 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1 }) {
                     const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
 
                     return (
-                        <div key={i} className="delta-pane-cell">
+                        <div key={i} className="delta-pane-cell" style={{ width: `${cellWidth}px` }}>
                             <div className="delta-pane-bar-container">
                                 <div
                                     className={`delta-pane-bar ${isBuy ? 'delta-pane-bar-buy' : 'delta-pane-bar-sell'}`}
@@ -51,11 +53,11 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1 }) {
                                 {formatVol(d.delta, true)}
                             </div>
                             <div className={`delta-pane-time ${isUp ? 'delta-pane-time-up' : 'delta-pane-time-down'}`}>
-                                {timeStr}
-                            </div>
-                        </div>
-                    );
-                })}
+                    {timeStr}
+                    </div>
+                </div>
+            );
+        })}
             </div>
         </div>
     );

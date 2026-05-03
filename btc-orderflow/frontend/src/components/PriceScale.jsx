@@ -1,17 +1,19 @@
 import React, { useRef, useMemo } from 'react';
 import { getTickDecimals } from '../utils/tickSteps';
 import { binFloorPrice, unbinPrice } from '../utils/priceBinning';
+import { formatPriceLike } from '../utils/formatVol';
 
 const CELL_HEIGHT = 24;
 const HEADER_HEIGHT = 32;
 
-export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1, onScaleDrag, onAutoFitToggle }) {
+export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1, onScaleDrag, onAutoFitToggle, priceDecimals }) {
   const scaleRef = useRef(null);
   const containerRef = useRef(null);
   const isDragging = useRef(false);
   const lastY = useRef(0);
 
   const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
     isDragging.current = true;
     lastY.current = e.clientY;
     document.addEventListener('mousemove', handleMouseMove);
@@ -22,6 +24,7 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
   const handleMouseMove = (e) => {
     if (!isDragging.current) return;
     const dy = e.clientY - lastY.current;
+    if (Math.abs(dy) < 1) return;
     onScaleDrag(-dy);
     lastY.current = e.clientY;
   };
@@ -39,7 +42,7 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
   const priceIndex = currentPriceBinned !== null
     ? prices.findIndex(p => Math.abs(p - currentPriceBinned) <= epsilon)
     : -1;
-  const decimals = getTickDecimals(tickSize);
+  const decimals = priceDecimals ?? getTickDecimals(tickSize);
 
   const liveLabelTop = useMemo(() => {
     if (priceIndex === -1) return null;
@@ -50,12 +53,16 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
     <div
       ref={scaleRef}
       className="price-scale-sidebar"
-      onPointerDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
         if (onAutoFitToggle) onAutoFitToggle();
       }}
     >
+      <div
+        className="price-scale-grip"
+        onPointerDown={handleMouseDown}
+        title="Drag to rescale vertically"
+      />
       <div
         ref={containerRef}
         className="price-scale-container"
@@ -72,7 +79,7 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
               className={`price-tick ${isActive ? 'price-tick-active' : ''}`}
               style={{ height: `${CELL_HEIGHT}px` }}
             >
-              <span className="tick-value">{price.toFixed(decimals)}</span>
+              <span className="tick-value">{formatPriceLike(price, decimals)}</span>
             </div>
           );
         })}
@@ -87,7 +94,7 @@ export function PriceScale({ prices, tickSize, lastPrice, transformY, scaleY = 1
             transform: 'translateY(-50%)',
           }}
         >
-          {Number(lastPrice).toFixed(decimals)}
+          {formatPriceLike(lastPrice, decimals)}
         </div>
       )}
     </div>

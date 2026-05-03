@@ -154,9 +154,11 @@ export class GestureHandler {
       
       if (gesture === 'horizontal-pan' && this.callbacks.onPan) {
         this.callbacks.onPan(dx, dy);
+        this.panStartPos = { x: touch.clientX, y: touch.clientY };
         e.preventDefault();
       } else if (gesture === 'vertical-scroll' && this.callbacks.onVerticalScroll) {
         this.callbacks.onVerticalScroll(dy);
+        this.panStartPos = { x: touch.clientX, y: touch.clientY };
         e.preventDefault();
       }
     }
