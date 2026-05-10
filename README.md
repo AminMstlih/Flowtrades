@@ -159,6 +159,8 @@ Access: http://localhost:8000
 ### Exchange Configuration
 By default, the application is pre-configured to use **OKX** as the primary data source. This is recommended for users in regions (like Indonesia) where Binance IP restrictions (`HTTP 403`) are common.
 
+> ⚓ **Architecture Note (OHLC Anchoring):** While the footprint ladder aggregates trading volume from ALL enabled exchanges to show full market liquidity, the Candlestick bounds (Open, High, Low, Close) are strictly anchored to the primary exchange (OKX). This prevents cross-exchange price differences (e.g. BTC-USDT-SWAP vs BTCUSDT) from creating visual artifacts or gaps in the candle bodies.
+
 To edit your exchange sources:
 1. Open `config.toml` in the root directory.
 2. Locate the `[exchanges]` section.

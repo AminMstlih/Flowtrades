@@ -114,7 +114,7 @@ class FootprintChart:
     Manages the ongoing active candle and a history of sealed candles.
     """
 
-    def __init__(self, bucket_size: float = 1.0, interval_seconds: int = 300, max_candles: int = 50, primary_exchange: str = "binance") -> None:
+    def __init__(self, bucket_size: float = 1.0, interval_seconds: int = 300, max_candles: int = 50, primary_exchange: str = "okx") -> None:
         if bucket_size <= 0:
             raise ValueError(f"bucket_size must be positive, got {bucket_size}")
         self.bucket_size = bucket_size
