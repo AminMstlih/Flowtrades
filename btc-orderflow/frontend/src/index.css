@@ -552,17 +552,12 @@ body {
 /* ── FIXED BOTTOM PANELS (TradingView Style) ─────────── */
 
 .fixed-bottom-panels {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 76px;
-  /* Leave space for price scale */
   height: 80px;
-  z-index: 40;
   display: flex;
   flex-direction: column;
   background: var(--bg-dark);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 /* ── DELTA PANE ──────────────────────────────────────── */

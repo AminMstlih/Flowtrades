@@ -21,6 +21,7 @@ function App() {
   const [autoFit, setAutoFit] = useState(true);
   const [timeframeWindow, setTimeframeWindow] = useState(5);
   const [showBadges, setShowBadges] = useState(true);
+  const [viewportScroll, setViewportScroll] = useState({ scrollX: 0, scaleX: 1 });
 
   // Connection status and raw data feed
   const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
@@ -113,11 +114,13 @@ function App() {
       />
 
       <div className="main-viewport-wrapper">
-        <div className="chart-area">
+        <div className="chart-area" style={{ position: 'relative', width: '100%', height: '100%' }}>
           <FootprintLwcChart 
             candles={vm.aggCandles} 
+            maxVolumeGlobal={vm.maxVolumeGlobal}
             showBadges={showBadges}
             autoFit={autoFit}
+            onViewportChange={(vp) => setViewportScroll(vp)}
           />
         </div>
       </div>
@@ -126,6 +129,9 @@ function App() {
         <DeltaPane
           candles={vm.aggCandles}
           priceDecimals={vm.instrument.priceDecimals}
+          scrollX={viewportScroll.offsetX !== undefined ? viewportScroll.offsetX : viewportScroll.scrollX}
+          scaleX={viewportScroll.scaleX}
+          barSpacing={viewportScroll.barSpacing}
         />
       </div>
 

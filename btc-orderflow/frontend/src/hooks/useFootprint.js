@@ -75,7 +75,12 @@ export function useFootprint(url) {
         // Parent component will read this via requestAnimationFrame loop
         
         // Apply time-window pruning to prevent memory leaks (Guide Section 5.5)
-        const prunedCandles = pruneTimeWindow(data.candles || []);
+        let prunedCandles = pruneTimeWindow(data.candles || []);
+        
+        // Cap candle buffer at 2000 to prevent unbounded memory growth (Guide Section 8.3)
+        if (prunedCandles.length > 2000) {
+          prunedCandles = prunedCandles.slice(prunedCandles.length - 2000);
+        }
         
         latestDataRef.current = {
           candles: prunedCandles,

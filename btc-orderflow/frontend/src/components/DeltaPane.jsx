@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { formatVol } from '../utils/formatVol';
 
-export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 }) {
+export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX = 1, barSpacing, priceDecimals = 2 }) {
     const { deltas, maxDelta } = useMemo(() => {
         if (!candles || candles.length === 0) {
             return { deltas: [], maxDelta: 1 };
@@ -22,7 +22,8 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 
 
     if (deltas.length === 0) return null;
 
-    const cellWidth = Math.max(48, Math.min(132, 140 * Math.max(0.75, scaleX)));
+    const cellWidth = barSpacing !== undefined ? barSpacing : Math.max(48, Math.min(132, 105 * Math.max(0.75, scaleX)));
+    const isZoomedOut = cellWidth < 30;
 
     return (
         <div className="delta-pane">
@@ -30,8 +31,7 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 
             <div
                 className="delta-pane-content"
                 style={{
-                    transformOrigin: 'top left',
-                    transform: `translateX(${scrollX}px) scaleX(${scaleX})`
+                    transform: `translateX(${scrollX}px)`
                 }}
             >
                 {deltas.map((d, i) => {
@@ -42,23 +42,30 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 
                     const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
 
                     return (
-                        <div key={i} className="delta-pane-cell" style={{ width: `${cellWidth}px` }}>
-                            <div className="delta-pane-bar-container">
-                                <div
-                                    className={`delta-pane-bar ${isBuy ? 'delta-pane-bar-buy' : 'delta-pane-bar-sell'}`}
-                                    style={{ width: `${deltaPct}%` }}
-                                />
-                            </div>
-                            <div className={`delta-pane-value ${isBuy ? 'delta-pane-value-buy' : 'delta-pane-value-sell'}`}>
+                        <div key={i} className="delta-pane-cell" style={{ width: `${cellWidth}px`, justifyContent: isZoomedOut ? 'center' : 'flex-end' }}>
+                            {!isZoomedOut && (
+                                <div className="delta-pane-bar-container">
+                                    <div
+                                        className={`delta-pane-bar ${isBuy ? 'delta-pane-bar-buy' : 'delta-pane-bar-sell'}`}
+                                        style={{ width: `${deltaPct}%` }}
+                                    />
+                                </div>
+                            )}
+                            <div 
+                              className={`delta-pane-value ${isBuy ? 'delta-pane-value-buy' : 'delta-pane-value-sell'}`}
+                              style={isZoomedOut ? { fontSize: '0.55rem', transform: 'rotate(-90deg)', whiteSpace: 'nowrap', width: '100%', textAlign: 'center' } : {}}
+                            >
                                 {formatVol(d.delta, true)}
                             </div>
-                            <div className={`delta-pane-time ${isUp ? 'delta-pane-time-up' : 'delta-pane-time-down'}`}>
-                    {timeStr}
-                    </div>
-                </div>
-            );
-        })}
+                            {!isZoomedOut && (
+                                <div className={`delta-pane-time ${isUp ? 'delta-pane-time-up' : 'delta-pane-time-down'}`}>
+                                    {timeStr}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
-}
+});

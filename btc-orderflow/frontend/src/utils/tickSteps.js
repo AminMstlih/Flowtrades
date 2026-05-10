@@ -18,16 +18,12 @@ export function getTickStepsForPrice(price) {
   const p = Number(price);
   if (!Number.isFinite(p) || p <= 0) return TICK_STEPS.slice();
 
-  const candidates = new Set();
-  const pctSteps = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01];
-  pctSteps.forEach((pct) => {
-    candidates.add(Number((p * pct).toFixed(8)));
-  });
-  TICK_STEPS.forEach((step) => candidates.add(step));
-
-  return Array.from(candidates)
-    .filter((step) => Number.isFinite(step) && step > 0)
-    .sort((a, b) => a - b);
+  // Find a reasonable center step based on 0.05% of price
+  const target = p * 0.0005;
+  
+  // Return all static tick steps that are remotely in the ballpark
+  // so the user has a clean, standard dropdown (1, 2, 5, 10, etc)
+  return TICK_STEPS.filter(step => step >= target / 100 && step <= target * 100);
 }
 
 export function getRecommendedTick(price) {
