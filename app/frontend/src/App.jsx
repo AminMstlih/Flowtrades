@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useFootprint } from './hooks/useFootprint';
+import React, { useEffect } from 'react';
+import { useUIStore } from './core/store/uiStore';
+import { useFootprintStore } from './core/store/footprintStore';
 import { Header } from './components/Header';
 import { FootprintLwcChart } from './components/FootprintLwcChart';
 import { DeltaPane } from './components/DeltaPane';
@@ -16,27 +17,19 @@ const getWsUrl = () => {
 const WS_URL_BASE = getWsUrl();
 
 function App() {
-  const [tickSize, setTickSize] = useState(1.0);
-  const [tickMode, setTickMode] = useState('auto');
-  const [autoFit, setAutoFit] = useState(true);
-  const [timeframeWindow, setTimeframeWindow] = useState(5);
-  const [showBadges, setShowBadges] = useState(true);
-  const [viewportScroll, setViewportScroll] = useState({ scrollX: 0, scaleX: 1 });
+  const {
+    tickSize, tickMode, autoFit, timeframeWindow, showBadges, viewportScroll,
+    setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll
+  } = useUIStore();
 
-  // Connection status and raw data feed
+  const { status, chartData, connect, disconnect } = useFootprintStore();
+
   const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
-  const { latestDataRef, status } = useFootprint(wsUrl);
-  
-  // Local state for the processed market data
-  const [chartData, setChartData] = useState({
-    candles: [],
-    last_price: 0,
-    window_sec: 300,
-    total_trades: 0,
-    total_candles: 0,
-    active_buckets: 0,
-    exchanges: []
-  });
+
+  useEffect(() => {
+    connect(wsUrl);
+    return () => disconnect();
+  }, [wsUrl, connect, disconnect]);
 
   // ViewModel handles aggregation, tick-sizing, and instrument inference
   const vm = useFootprintViewModel({
@@ -44,47 +37,23 @@ function App() {
     tickSize,
     autoFit,
     tickMode,
-    viewportSize: { width: 1000, height: 800 }, // Mock size for non-visual logic
+    viewportSize: { width: 1000, height: 800 },
     orderedCandles: chartData.candles,
     transform: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
     userHasPanned: false,
     setTickSize,
     setTransform: () => {},
   });
-  
-  // Render loop to consume WebSocket data via rAF
-  useEffect(() => {
-    let animFrameId;
-    function renderLoop() {
-      perfMonitor.tick();
-      const newData = latestDataRef.current;
-      if (newData) {
-        setChartData({
-          candles: newData.candles,
-          last_price: newData.last_price,
-          window_sec: newData.window_sec,
-          total_trades: newData.total_trades,
-          total_candles: newData.total_candles,
-          active_buckets: newData.active_buckets,
-          exchanges: newData.exchanges
-        });
-        latestDataRef.current = null;
-      }
-      animFrameId = requestAnimationFrame(renderLoop);
-    }
-    animFrameId = requestAnimationFrame(renderLoop);
-    return () => cancelAnimationFrame(animFrameId);
-  }, [latestDataRef]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'p' || e.key === 'P') perfMonitor.logReport();
-      if (e.key === 'b' || e.key === 'B') setShowBadges(prev => !prev);
+      if (e.key === 'b' || e.key === 'B') setShowBadges(!useUIStore.getState().showBadges);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [setShowBadges]);
 
   // Auto-fit and auto-tick logic
   useEffect(() => {
@@ -106,7 +75,7 @@ function App() {
         setTickSize={vm.setTickSizeSnapped}
         setTickMode={setTickMode}
         autoFit={autoFit}
-        onAutoFitToggle={() => setAutoFit(prev => !prev)}
+        onAutoFitToggle={() => setAutoFit(!autoFit)}
         timeframeWindow={timeframeWindow}
         setTimeframeWindow={setTimeframeWindow}
         showBadges={showBadges}
@@ -120,7 +89,7 @@ function App() {
             maxVolumeGlobal={vm.maxVolumeGlobal}
             showBadges={showBadges}
             autoFit={autoFit}
-            onViewportChange={(vp) => setViewportScroll(vp)}
+            onViewportChange={setViewportScroll}
           />
         </div>
       </div>

@@ -29,7 +29,7 @@
   --buy-green: #26A69A;
   --sell-red: #EF5350;
   --accent-orange: #F9A825;
-  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+  --font-mono: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --cell-h: 24px;
 }
 

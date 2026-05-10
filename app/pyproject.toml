@@ -1,5 +1,5 @@
 [project]
-name = "btc-orderflow"
+name = "flowtrades"
 version = "0.1.0"
 description = "Real-time BTC order flow visualization across Binance, OKX, and Bybit"
 requires-python = ">=3.10"

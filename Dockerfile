@@ -1,9 +1,9 @@
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY btc-orderflow/frontend/package*.json ./
+COPY app/frontend/package*.json ./
 RUN npm install
-COPY btc-orderflow/frontend/ ./
+COPY app/frontend/ ./
 RUN npm run build
 
 # Stage 2: Python Backend
@@ -14,12 +14,12 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies using the pyproject.toml
-RUN pip install --no-cache-dir ./btc-orderflow
+RUN pip install --no-cache-dir ./app
 
 # Copy built frontend from Stage 1 to the correct location
-# ws_server.py looks for btc-orderflow/frontend/dist
-RUN rm -rf btc-orderflow/frontend/dist
-COPY --from=frontend-builder /app/frontend/dist ./btc-orderflow/frontend/dist
+# ws_server.py looks for app/frontend/dist
+RUN rm -rf app/frontend/dist
+COPY --from=frontend-builder /app/frontend/dist ./app/frontend/dist
 
 # Set environment variables
 ENV PORT=8000
@@ -29,6 +29,6 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 8000
 
-# Run the application directly from the btc-orderflow directory
-WORKDIR /app/btc-orderflow
+# Run the application directly from the app directory
+WORKDIR /app/app
 CMD ["python", "main.py"]

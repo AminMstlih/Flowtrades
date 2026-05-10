@@ -1,0 +1,848 @@
+﻿diff --git a/btc-orderflow/frontend/src/App.jsx b/btc-orderflow/frontend/src/App.jsx
+index 483b8a5..164215b 100644
+--- a/btc-orderflow/frontend/src/App.jsx
++++ b/btc-orderflow/frontend/src/App.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useCallback, useMemo, useEffect } from 'react';
++import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+ import { useFootprint } from './hooks/useFootprint';
+ import { Header } from './components/Header';
+ import { FootprintLwcChart } from './components/FootprintLwcChart';
+@@ -8,10 +8,10 @@ import { useFootprintViewModel } from './hooks/useFootprintViewModel';
+ 
+ // Connect to the FastAPI WebSocket broadcast
+ const getWsUrl = () => {
+-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+-    const host = window.location.host;
+-    const wsHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
+-    return `${protocol}//${wsHost}/ws/footprint`;
++  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
++  const host = window.location.host;
++  const wsHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
++  return `${protocol}//${wsHost}/ws/footprint`;
+ };
+ const WS_URL_BASE = getWsUrl();
+ 
+@@ -21,11 +21,37 @@ function App() {
+   const [autoFit, setAutoFit] = useState(true);
+   const [timeframeWindow, setTimeframeWindow] = useState(5);
+   const [showBadges, setShowBadges] = useState(true);
++  const [viewportSize, setViewportSize] = useState({ width: 1000, height: 800 });
++  const chartAreaRef = useRef(null);
++  const [viewportScroll, setViewportScroll] = useState({ scrollX: 0, scaleX: 1 });
+ 
+   // Connection status and raw data feed
+   const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
+   const { latestDataRef, status } = useFootprint(wsUrl);
+-  
++
++  const [staleSince, setStaleSince] = useState(null);
++  const staleTimerRef = useRef(null);
++
++  // Track staleness: 2 seconds after status leaves 'connected', show overlay
++  useEffect(() => {
++    if (status !== 'connected') {
++      if (!staleTimerRef.current) {
++        staleTimerRef.current = setTimeout(() => {
++          setStaleSince(Date.now());
++        }, 2000);
++      }
++    } else {
++      if (staleTimerRef.current) {
++        clearTimeout(staleTimerRef.current);
++        staleTimerRef.current = null;
++      }
++      setStaleSince(null);
++    }
++    return () => {
++      if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
++    };
++  }, [status]);
++
+   // Local state for the processed market data
+   const [chartData, setChartData] = useState({
+     candles: [],
+@@ -37,20 +63,36 @@ function App() {
+     exchanges: []
+   });
+ 
++  // Track actual viewport size via ResizeObserver
++  useEffect(() => {
++    const el = chartAreaRef.current;
++    if (!el) return;
++    const observer = new ResizeObserver((entries) => {
++      const entry = entries[0];
++      if (!entry) return;
++      const { width, height } = entry.contentRect;
++      if (width > 0 && height > 0) {
++        setViewportSize({ width: Math.round(width), height: Math.round(height) });
++      }
++    });
++    observer.observe(el);
++    return () => observer.disconnect();
++  }, []);
++
+   // ViewModel handles aggregation, tick-sizing, and instrument inference
+   const vm = useFootprintViewModel({
+     chartData,
+     tickSize,
+     autoFit,
+     tickMode,
+-    viewportSize: { width: 1000, height: 800 }, // Mock size for non-visual logic
++    viewportSize,
+     orderedCandles: chartData.candles,
+     transform: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
+     userHasPanned: false,
+     setTickSize,
+-    setTransform: () => {},
++    setTransform: () => { },
+   });
+-  
++
+   // Render loop to consume WebSocket data via rAF
+   useEffect(() => {
+     let animFrameId;
+@@ -94,6 +136,11 @@ function App() {
+     if (!autoFit) vm.syncAutoTick();
+   }, [vm.syncAutoTick, autoFit, chartData.last_price, tickMode, tickSize]);
+ 
++  // Forward viewport scroll changes from chart to DeltaPane
++  const handleViewportChange = useCallback((vp) => {
++    setViewportScroll(vp);
++  }, []);
++
+   return (
+     <div className="dashboard">
+       <Header
+@@ -114,11 +161,15 @@ function App() {
+ 
+       <div className="main-viewport-wrapper">
+         <div className="chart-area">
+-          <FootprintLwcChart 
+-            candles={vm.aggCandles} 
+-            showBadges={showBadges}
+-            autoFit={autoFit}
+-          />
++          <div ref={chartAreaRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
++            <FootprintLwcChart
++              candles={vm.aggCandles}
++              maxVolumeGlobal={vm.maxVolumeGlobal}
++              showBadges={showBadges}
++              autoFit={autoFit}
++              onViewportChange={handleViewportChange}
++            />
++          </div>
+         </div>
+       </div>
+ 
+@@ -126,9 +177,26 @@ function App() {
+         <DeltaPane
+           candles={vm.aggCandles}
+           priceDecimals={vm.instrument.priceDecimals}
++          scrollX={viewportScroll.scrollX}
++          scaleX={viewportScroll.scaleX}
+         />
+       </div>
+ 
++      {/* Stale data overlay */}
++      {staleSince && chartData.candles.length > 0 && (
++        <div className="stale-overlay">
++          <div className="stale-content">
++            <div className="stale-title">ΓÜá STALE DATA</div>
++            <div className="stale-sub">
++              Connection lost {new Date(staleSince).toLocaleTimeString()}. Data shown may be outdated.
++            </div>
++            <button className="stale-reconnect" onClick={() => window.location.reload()}>
++              Reconnect
++            </button>
++          </div>
++        </div>
++      )}
++
+       {/* Loading overlay */}
+       {chartData.candles.length === 0 && (
+         <div className="loading-overlay">
+diff --git a/btc-orderflow/frontend/src/components/DeltaPane.jsx b/btc-orderflow/frontend/src/components/DeltaPane.jsx
+index f90c563..0cb181c 100644
+--- a/btc-orderflow/frontend/src/components/DeltaPane.jsx
++++ b/btc-orderflow/frontend/src/components/DeltaPane.jsx
+@@ -1,7 +1,7 @@
+-import React, { useMemo } from 'react';
++import React, { memo, useMemo } from 'react';
+ import { formatVol } from '../utils/formatVol';
+ 
+-export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 }) {
++export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2 }) {
+     const { deltas, maxDelta } = useMemo(() => {
+         if (!candles || candles.length === 0) {
+             return { deltas: [], maxDelta: 1 };
+@@ -53,12 +53,12 @@ export function DeltaPane({ candles, scrollX = 0, scaleX = 1, priceDecimals = 2
+                                 {formatVol(d.delta, true)}
+                             </div>
+                             <div className={`delta-pane-time ${isUp ? 'delta-pane-time-up' : 'delta-pane-time-down'}`}>
+-                    {timeStr}
+-                    </div>
+-                </div>
+-            );
+-        })}
++                                {timeStr}
++                            </div>
++                        </div>
++                    );
++                })}
+             </div>
+         </div>
+     );
+-}
++});
+diff --git a/btc-orderflow/frontend/src/components/FootprintCanvas.jsx b/btc-orderflow/frontend/src/components/FootprintCanvas.jsx
+index f92f148..d34ce95 100644
+--- a/btc-orderflow/frontend/src/components/FootprintCanvas.jsx
++++ b/btc-orderflow/frontend/src/components/FootprintCanvas.jsx
+@@ -20,11 +20,11 @@ import { DETAIL_LEVEL, getCandleFootprintLayout, getDetailLevel, getSmoothFootpr
+  * @param {number} props.lastPrice - Current market price
+  * @param {Object} props.chartRef - Lightweight Charts instance (for price sync)
+  */
+-export function FootprintCanvas({ 
+-  candles = [], 
++export function FootprintCanvas({
++  candles = [],
+   aggCandles = [],
+-  prices = [], 
+-  tickSize = 1.0, 
++  prices = [],
++  tickSize = 1.0,
+   lastPrice = null,
+   transform = { x: 0, y: 0, scaleX: 1, scaleY: 1 },
+   showBadges = true,
+@@ -76,22 +76,21 @@ export function FootprintCanvas({
+     if (!canvasRef.current) return;
+ 
+     const canvas = canvasRef.current;
+-    
++
+     // Set initial size immediately
+     const container = canvas.parentElement || document.querySelector('.chart-area');
+-    
++
+     if (!container) {
+       console.error('[FootprintCanvas] No parent container found');
+       return;
+     }
+ 
+     const rect = container.getBoundingClientRect();
+-    console.log(`[FootprintCanvas] Parent container size: ${rect.width}x${rect.height}`);
+-    
++
+     if (rect.width > 0 && rect.height > 0) {
+       sizeRef.current = { width: rect.width, height: rect.height };
+       ctxRef.current = setupHiDPICanvas(canvas, rect.width, rect.height);
+-      
++
+       // Set positioning immediately
+       canvas.style.position = 'absolute';
+       canvas.style.top = '0';
+@@ -100,7 +99,6 @@ export function FootprintCanvas({
+       canvas.style.height = `${rect.height}px`;
+       canvas.style.pointerEvents = 'none';
+       canvas.style.zIndex = '100';
+-      console.log(`[FootprintCanvas] Canvas initialized: ${rect.width}x${rect.height}`);
+     }
+ 
+     const resizeObserver = new ResizeObserver(entries => {
+@@ -108,14 +106,14 @@ export function FootprintCanvas({
+       if (!entry) return;
+ 
+       const { width, height } = entry.contentRect;
+-      
++
+       // Only update if we have valid dimensions
+       if (width > 0 && height > 0) {
+         sizeRef.current = { width, height };
+ 
+         // Setup HiDPI canvas (Guide Section 1.4)
+         ctxRef.current = setupHiDPICanvas(canvas, width, height);
+-        
++
+         // Position canvas absolutely
+         canvas.style.position = 'absolute';
+         canvas.style.top = '0';
+@@ -225,13 +223,13 @@ export function FootprintCanvas({
+     // Draw each price row
+     prices.forEach((price, rowIndex) => {
+       const y = (rowIndex * ROW_HEIGHT) + HEADER_HEIGHT;
+-      
++
+       // Skip if off-screen (canvas only translates, no scale applied)
+       const screenY = transform.y + y;
+       const screenBottom = screenY + ROW_HEIGHT;
+       if (screenBottom < 0 || screenY > height) return;
+ 
+-      const isCurrentPriceRow = currentPriceBinned !== null && 
++      const isCurrentPriceRow = currentPriceBinned !== null &&
+         Math.abs(price - currentPriceBinned) <= priceEps;
+ 
+       // Subtle row separator instead of strong table banding
+@@ -255,9 +253,9 @@ export function FootprintCanvas({
+       aggCandles.forEach((candle, colIndex) => {
+         const x = colIndex * colWidth;
+         const isUp = candle.close >= candle.open;
+-        
++
+         // Find bucket for this price
+-        const bucket = candle.aggBuckets?.find(b => 
++        const bucket = candle.aggBuckets?.find(b =>
+           Math.abs(b.price - price) <= priceEps
+         );
+ 
+@@ -352,7 +350,7 @@ export function FootprintCanvas({
+   useEffect(() => {
+     // Skip if canvas isn't ready yet
+     if (!ctxRef.current || sizeRef.current.width === 0) return;
+-    
++
+     drawFootprint();
+   }, [candles, aggCandles, prices, tickSize, lastPrice, transform, showBadges]); // Only redraw when data changes
+ 
+diff --git a/btc-orderflow/frontend/src/components/FootprintLwcChart.jsx b/btc-orderflow/frontend/src/components/FootprintLwcChart.jsx
+index d459559..0ff1082 100644
+--- a/btc-orderflow/frontend/src/components/FootprintLwcChart.jsx
++++ b/btc-orderflow/frontend/src/components/FootprintLwcChart.jsx
+@@ -1,4 +1,4 @@
+-import { createChart } from 'lightweight-charts';
++import { createChart, CrosshairMode } from 'lightweight-charts';
+ import { useEffect, useMemo, useRef, useCallback } from 'react';
+ 
+ function defaultOptions() {
+@@ -11,24 +11,27 @@ function defaultOptions() {
+   };
+ }
+ 
+-function makeFootprintPaneView() {
++function makeFootprintPaneView(volumeGlobalRef) {
+   const state = {
+     bars: [],
+     barSpacing: 8,
+     conflationFactor: 1,
+     options: defaultOptions(),
++    maxVolumeGlobal: 1,
+   };
+ 
+   const renderer = {
+     draw(target, priceToCoordinate, _isHovered) {
+       const { bars, barSpacing, conflationFactor, options } = state;
++      // Read current global max volume from the mutable ref so it updates live
++      const maxVolumeGlobal = Math.max(volumeGlobalRef?.current || 1, 1);
+       if (!bars || bars.length === 0) return;
+ 
+       const effectiveBarSpacing = Math.max(1, barSpacing * (conflationFactor || 1));
+       const laneWidth = Math.max(6, effectiveBarSpacing * 0.9);
+ 
+-      // Define zoom levels based on laneWidth (approximate transition points)
+-      const showFootprint = laneWidth > 18;
++      // Smooth zoom transition: footprint bars appear at wider zooms, numbers only at very wide
++      const showFootprint = laneWidth > 10;
+       const showNumbers = laneWidth > 48;
+ 
+       target.useBitmapCoordinateSpace((scope) => {
+@@ -39,7 +42,6 @@ function makeFootprintPaneView() {
+         ctx.lineCap = 'square';
+ 
+         const px = scope.horizontalPixelRatio || 1;
+-        const py = scope.verticalPixelRatio || 1;
+ 
+         for (const item of bars) {
+           const x = item.x;
+@@ -63,13 +65,13 @@ function makeFootprintPaneView() {
+           const bodyBottom = Math.max(yOpen, yClose);
+           const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+ 
+-          // Candle body width shrinks when footprints are shown to emphasize the flow
++          // Candle body width ΓÇö shrinks when footprints shown to emphasize the flow
+           const bodyWidth = showFootprint
+-            ? Math.max(3, Math.min(10, laneWidth * 0.15))
++            ? Math.max(4, Math.min(12, laneWidth * 0.18))
+             : laneWidth * 0.7;
+ 
+-          const left = x - laneWidth / 2;
+           const centerX = x;
++          const laneLeft = x - laneWidth / 2;
+ 
+           // 1. Wick
+           ctx.strokeStyle = isUp ? 'rgba(38, 166, 154, 0.6)' : 'rgba(239, 83, 80, 0.6)';
+@@ -79,18 +81,12 @@ function makeFootprintPaneView() {
+           ctx.lineTo(centerX, yLow);
+           ctx.stroke();
+ 
+-          // 2. Footprint Data (Underlay: Tints and Bars)
++          // 2. Footprint Volume Bars (per price level inside the candle)
+           if (showFootprint) {
+             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
+             if (buckets.length > 0) {
+-              let localMax = 1;
+-              for (const b of buckets) {
+-                const v = (Number(b.buy_vol) || 0) + (Number(b.sell_vol) || 0);
+-                if (v > localMax) localMax = v;
+-              }
+-
+               const rowH = Math.max(8, Math.min(24, effectiveBarSpacing * 0.5));
+-              const rowHalf = rowH / 2;
++              const barHeight = Math.max(3, rowH * 0.55); // bars fit within the row, no overlap
+ 
+               for (const b of buckets) {
+                 const price = Number(b.price);
+@@ -101,29 +97,36 @@ function makeFootprintPaneView() {
+                 const sell = Number(b.sell_vol) || 0;
+                 if (buy + sell <= 0) continue;
+ 
+-                const opacity = Math.min((buy + sell) / localMax, 1);
++                // Global max volume for consistent bar sizing across all candles
+                 const halfLane = laneWidth * 0.48;
+-                const leftBar = (sell / localMax) * halfLane;
+-                const rightBar = (buy / localMax) * halfLane;
++                const leftBar = Math.min((sell / maxVolumeGlobal) * halfLane, halfLane);
++                const rightBar = Math.min((buy / maxVolumeGlobal) * halfLane, halfLane);
+ 
+-                // background cell tint
++                // Subtle background cell tint
++                const opacity = Math.min((buy + sell) / maxVolumeGlobal, 1);
+                 ctx.fillStyle = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+-                ctx.fillRect(left, y - rowHalf, laneWidth, rowH);
+-
+-                // volume bars
+-                ctx.fillStyle = options.sellVol;
+-                ctx.fillRect(centerX - 1 - leftBar, y - rowHalf * 0.7, leftBar, rowH * 0.7 * 2);
+-                ctx.fillStyle = options.buyVol;
+-                ctx.fillRect(centerX + 1, y - rowHalf * 0.7, rightBar, rowH * 0.7 * 2);
++                ctx.fillRect(laneLeft, y - rowH / 2, laneWidth, rowH);
++
++                // Sell bar (left side) ΓÇö contained within row height
++                if (leftBar > 0) {
++                  ctx.fillStyle = options.sellVol;
++                  ctx.fillRect(centerX - 1 - leftBar, y - barHeight / 2, leftBar, barHeight);
++                }
++
++                // Buy bar (right side) ΓÇö contained within row height
++                if (rightBar > 0) {
++                  ctx.fillStyle = options.buyVol;
++                  ctx.fillRect(centerX + 1, y - barHeight / 2, rightBar, barHeight);
++                }
+               }
+             }
+           }
+ 
+-          // 3. Body (Drawn over the bars but under the text)
+-          ctx.fillStyle = isUp ? 'rgba(38, 166, 154, 0.8)' : 'rgba(239, 83, 80, 0.8)';
++          // 3. Candle Body ΓÇö single solid rectangle, no overlapping border outline
++          ctx.fillStyle = isUp ? 'rgba(38, 166, 154, 0.85)' : 'rgba(239, 83, 80, 0.85)';
+           ctx.fillRect(centerX - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+ 
+-          // 4. Footprint Overlay (Numeric detail)
++          // 4. Footprint Numeric Overlay (only at very wide zoom ΓÇö full detail)
+           if (showFootprint && showNumbers) {
+             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
+             const rowH = Math.max(8, Math.min(24, effectiveBarSpacing * 0.5));
+@@ -138,31 +141,25 @@ function makeFootprintPaneView() {
+ 
+               const fontSize = Math.max(9, Math.min(15, rowH * 0.7));
+               ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+-              
++
+               ctx.strokeStyle = '#0D1B2A';
+               ctx.lineWidth = 2.5;
+               ctx.lineJoin = 'round';
+-              
++
+               const sellText = String(Math.round(sell));
+               const buyText = String(Math.round(buy));
+-              
++
+               ctx.textAlign = 'right';
+               ctx.strokeText(sellText, centerX - 4, y);
+-              ctx.fillStyle = '#FFFFFF'; 
++              ctx.fillStyle = '#FFFFFF';
+               ctx.fillText(sellText, centerX - 4, y);
+-              
++
+               ctx.textAlign = 'left';
+               ctx.strokeText(buyText, centerX + 4, y);
+               ctx.fillStyle = '#FFFFFF';
+               ctx.fillText(buyText, centerX + 4, y);
+             }
+           }
+-
+-          // Border for the "Option A" look
+-          if (showFootprint) {
+-            ctx.strokeStyle = isUp ? 'rgba(38, 166, 154, 0.4)' : 'rgba(239, 83, 80, 0.4)';
+-            ctx.strokeRect(left, bodyTop, laneWidth, bodyHeight);
+-          }
+         }
+ 
+         ctx.restore();
+@@ -193,7 +190,7 @@ function makeFootprintPaneView() {
+   };
+ }
+ 
+-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction }) {
++export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, onViewportChange, maxVolumeGlobal }) {
+   const containerRef = useRef(null);
+   const chartRef = useRef(null);
+   const seriesRef = useRef(null);
+@@ -201,6 +198,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+   const isProgrammaticChangeRef = useRef(false);
+   const lastFirstCandleTimeRef = useRef(null);
+   const lastCandleCountRef = useRef(0);
++  // Mutable ref for maxVolumeGlobal ΓÇö paneView reads from this every draw
++  const volumeGlobalRef = useRef(Math.max(maxVolumeGlobal || 1, 1));
++  // Update the ref whenever the prop changes
++  volumeGlobalRef.current = Math.max(maxVolumeGlobal || 1, 1);
+ 
+   const mapCandle = useCallback((c) => ({
+     time: c.time || c.ts || c.start_time || c.open_time || Math.floor((c.timestamp || Date.now()) / 1000),
+@@ -225,6 +226,21 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+         vertLines: { color: 'rgba(30, 52, 72, 0.9)' },
+         horzLines: { color: 'rgba(30, 52, 72, 0.9)' },
+       },
++      crosshair: {
++        mode: CrosshairMode.Normal,
++        vertLine: {
++          color: 'rgba(143, 168, 190, 0.4)',
++          width: 1,
++          style: 2,
++          labelBackgroundColor: '#1565C0',
++        },
++        horzLine: {
++          color: 'rgba(143, 168, 190, 0.4)',
++          width: 1,
++          style: 2,
++          labelBackgroundColor: '#1565C0',
++        },
++      },
+       rightPriceScale: {
+         borderColor: 'rgba(30, 52, 72, 0.9)',
+         autoScale: true,
+@@ -240,17 +256,31 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+       autoSize: true,
+     });
+ 
+-    const paneView = makeFootprintPaneView();
++    // Pass the mutable ref so paneView reads the latest maxVolumeGlobal on every draw
++    const paneView = makeFootprintPaneView(volumeGlobalRef);
+     const series = chart.addCustomSeries(paneView, {});
+ 
+     chartRef.current = chart;
+     seriesRef.current = series;
+ 
+-    // Detect user interaction
++    // Forward scroll/zoom changes to DeltaPane via onViewportChange.
++    // Uses actual pixel dimensions from chart for accurate alignment.
+     chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+       if (isProgrammaticChangeRef.current) return;
+       if (hasInitializedRef.current) {
+         onInteraction?.();
++        if (onViewportChange) {
++          const logicalRange = chart.timeScale().getVisibleLogicalRange();
++          if (logicalRange) {
++            const visibleCandles = Math.max(1, logicalRange.to - logicalRange.from);
++            const totalWidthPx = chart.timeScale().width();
++            const actualBarWidthPx = totalWidthPx / visibleCandles;
++            const baseCellWidth = 105;
++            const scaleX = actualBarWidthPx / baseCellWidth;
++            const scrollX = -logicalRange.from * actualBarWidthPx;
++            onViewportChange({ scrollX, scaleX: Math.max(0.75, scaleX) });
++          }
++        }
+       }
+     });
+ 
+@@ -259,7 +289,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+       chartRef.current = null;
+       seriesRef.current = null;
+     };
+-  }, [onInteraction]);
++  }, [onInteraction, onViewportChange]);
+ 
+   // Update Data Logic
+   useEffect(() => {
+@@ -269,7 +299,6 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+     const isHistoryShift = lastFirstCandleTimeRef.current !== firstCandleTime;
+     const isMajorCountChange = Math.abs(candles.length - lastCandleCountRef.current) > 1;
+ 
+-    // If it's a completely new dataset, history shifted (pruned), or tick size changed
+     if (!hasInitializedRef.current || isHistoryShift || isMajorCountChange) {
+       const allMapped = candles.map(mapCandle);
+       seriesRef.current.setData(allMapped);
+@@ -281,22 +310,19 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+         setTimeout(() => { isProgrammaticChangeRef.current = false; }, 100);
+       }
+     } else {
+-      // Just a live tick update: use update() instead of setData()
+-      // This preserves user zoom, pan, and manual scale states!
+       const lastCandle = mapCandle(candles[candles.length - 1]);
+       seriesRef.current.update(lastCandle);
+     }
+ 
+     lastFirstCandleTimeRef.current = firstCandleTime;
+     lastCandleCountRef.current = candles.length;
+-  }, [candles, mapCandle]);
++  }, [candles, mapCandle, maxVolumeGlobal]);
+ 
+   // Handle explicit Auto-Fit trigger from parent
+   useEffect(() => {
+     if (autoFit && chartRef.current && candles.length > 0) {
+       isProgrammaticChangeRef.current = true;
+       chartRef.current.timeScale().fitContent();
+-      // Optional: reset vertical scale to auto
+       chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+       setTimeout(() => { isProgrammaticChangeRef.current = false; }, 100);
+     }
+@@ -312,4 +338,4 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
+       }}
+     />
+   );
+-}
++}
+\ No newline at end of file
+diff --git a/btc-orderflow/frontend/src/components/Header.jsx b/btc-orderflow/frontend/src/components/Header.jsx
+index 96eff1c..36ea2f7 100644
+--- a/btc-orderflow/frontend/src/components/Header.jsx
++++ b/btc-orderflow/frontend/src/components/Header.jsx
+@@ -1,8 +1,8 @@
+-import React from 'react';
++import React, { memo } from 'react';
+ import { TICK_STEPS, snapTick } from '../utils/tickSteps';
+ import { formatPriceLike } from '../utils/formatVol';
+ 
+-export function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
++export const Header = memo(function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
+   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
+ 
+   // Map status to display values
+@@ -100,4 +100,4 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
+       </div>
+     </div>
+   );
+-}
++});
+diff --git a/btc-orderflow/frontend/src/hooks/useFootprint.js b/btc-orderflow/frontend/src/hooks/useFootprint.js
+index 70211c0..27be1a7 100644
+--- a/btc-orderflow/frontend/src/hooks/useFootprint.js
++++ b/btc-orderflow/frontend/src/hooks/useFootprint.js
+@@ -15,10 +15,10 @@ const MAX_WINDOW_SEC = 86400; // 24 hours - allow history for higher timeframes
+  */
+ function pruneTimeWindow(candles, windowSec = MAX_WINDOW_SEC) {
+   if (!candles || candles.length === 0) return [];
+-  
++
+   const now = Date.now();
+   const cutoffMs = now - (windowSec * 1000);
+-  
++
+   // Filter candles that are within the time window
+   return candles.filter(c => {
+     const candleTime = c.start_time || c.end_time || c.timestamp || c.ts || now;
+@@ -40,7 +40,7 @@ function pruneTimeWindow(candles, windowSec = MAX_WINDOW_SEC) {
+ export function useFootprint(url) {
+   // UI state only - safe to use setState
+   const [status, setStatus] = useState('connecting'); // 'connecting' | 'connected' | 'reconnecting' | 'offline'
+-  
++
+   // CRITICAL: Live data in refs - NO setState on tick data (Anti-Pattern #1)
+   const latestDataRef = useRef(null);
+   const wsRef = useRef(null);
+@@ -52,7 +52,7 @@ export function useFootprint(url) {
+ 
+     console.log(`[ws] Connecting to ${url}...`);
+     setStatus('connecting');
+-    
++
+     const ws = new WebSocket(url);
+ 
+     ws.onopen = () => {
+@@ -67,16 +67,21 @@ export function useFootprint(url) {
+     ws.onmessage = (event) => {
+       try {
+         const data = JSON.parse(event.data);
+-        
++
+         // Track WebSocket message rate (Guide Section 8)
+         perfMonitor.onWsMessage();
+-        
++
+         // CRITICAL: Store in ref - DO NOT call setState here!
+         // Parent component will read this via requestAnimationFrame loop
+-        
++
+         // Apply time-window pruning to prevent memory leaks (Guide Section 5.5)
+-        const prunedCandles = pruneTimeWindow(data.candles || []);
+-        
++        let prunedCandles = pruneTimeWindow(data.candles || []);
++
++        // Cap candle buffer at 2000 to prevent unbounded memory growth (Guide Section 8.3)
++        if (prunedCandles.length > 2000) {
++          prunedCandles = prunedCandles.slice(prunedCandles.length - 2000);
++        }
++
+         latestDataRef.current = {
+           candles: prunedCandles,
+           last_price: data.last_price || 0,
+@@ -96,14 +101,14 @@ export function useFootprint(url) {
+       console.log('[ws] Disconnected');
+       setStatus('reconnecting');
+       wsRef.current = null;
+-      
++
+       // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+       const delay = Math.min(
+         MAX_RECONNECT_DELAY_MS,
+         RECONNECT_DELAY_MS * Math.pow(2, reconnectAttemptsRef.current)
+       );
+       reconnectAttemptsRef.current += 1;
+-      
++
+       console.log(`[ws] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
+       reconnectTimeoutRef.current = setTimeout(connect, delay);
+     };
+diff --git a/btc-orderflow/frontend/src/hooks/useFootprintViewModel.js b/btc-orderflow/frontend/src/hooks/useFootprintViewModel.js
+index 6bfb6fb..56a3274 100644
+--- a/btc-orderflow/frontend/src/hooks/useFootprintViewModel.js
++++ b/btc-orderflow/frontend/src/hooks/useFootprintViewModel.js
+@@ -1,4 +1,4 @@
+-import { useMemo, useCallback } from 'react';
++import { useMemo, useCallback, useRef } from 'react';
+ import { snapTick, getTickStepsForPrice, getRecommendedTick } from '../utils/tickSteps';
+ import { binCeilPrice, binFloorPrice, binRoundPrice, unbinPrice } from '../utils/priceBinning';
+ import { aggregateCandles } from '../utils/aggregateCandles';
+@@ -35,9 +35,27 @@ export function useFootprintViewModel({
+     setTickSize(snapTick(Number(rawTick), 'nearest'));
+   }, [setTickSize]);
+ 
++  // Deep-comparison optimization: only re-aggregate when candle data structurally changes.
++  // Cache key includes: candle count, first/last close, last high/low, tickSize.
++  // This captures: history shifts, new ticks, extending highs/lows, tick size changes.
++  const cacheKeyRef = useRef('');
++  const lastCandle = orderedCandles && orderedCandles.length > 0
++    ? orderedCandles[orderedCandles.length - 1]
++    : null;
++  const firstCandle = orderedCandles && orderedCandles.length > 0
++    ? orderedCandles[0]
++    : null;
++  const aggCacheKey = firstCandle && lastCandle
++    ? `${orderedCandles.length}|${firstCandle?.close || 0}|${lastCandle?.close || 0}|${lastCandle?.high || 0}|${lastCandle?.low || 0}|${tickSize}`
++    : 'empty';
++  if (aggCacheKey !== cacheKeyRef.current) {
++    cacheKeyRef.current = aggCacheKey;
++  }
++
+   const { aggCandles, maxVolumeGlobal } = useMemo(() => {
+     return aggregateCandles(orderedCandles, tickSize);
+-  }, [orderedCandles, tickSize]);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [cacheKeyRef.current]);
+ 
+   const priceLadder = useMemo(() => {
+     if (!orderedCandles || orderedCandles.length === 0) {
+@@ -76,7 +94,7 @@ export function useFootprintViewModel({
+     }
+ 
+     return { prices, minBin, maxBin };
+-  }, [orderedCandles, chartData.last_price, tickSize]);
++  }, [cacheKeyRef.current, chartData.last_price, tickSize]);
+ 
+   const candleRange = useMemo(() => {
+     const highs = orderedCandles.map((c) => c.high).filter((v) => typeof v === 'number');
+@@ -180,4 +198,4 @@ export function useFootprintViewModel({
+     handleAutoFitToggle,
+     snapViewportToData,
+   };
+-}
++}
+\ No newline at end of file
+diff --git a/btc-orderflow/frontend/src/index.css b/btc-orderflow/frontend/src/index.css
+index 97cf336..a3e1621 100644
+--- a/btc-orderflow/frontend/src/index.css
++++ b/btc-orderflow/frontend/src/index.css
+@@ -1151,4 +1151,66 @@ body {
+   .price-tick {
+     font-size: 0.85rem;
+   }
++}
++
++/* ΓöÇΓöÇ STALE DATA OVERLAY ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
++
++.stale-overlay {
++  position: fixed;
++  top: 0;
++  left: 0;
++  right: 0;
++  bottom: 0;
++  z-index: 9998;
++  display: flex;
++  align-items: flex-start;
++  justify-content: center;
++  pointer-events: auto;
++  background: rgba(13, 27, 42, 0.85);
++  backdrop-filter: blur(4px);
++}
++
++.stale-content {
++  margin-top: 80px;
++  padding: 24px 32px;
++  background: rgba(17, 31, 46, 0.96);
++  border: 1px solid rgba(255, 152, 0, 0.3);
++  border-radius: 12px;
++  text-align: center;
++  max-width: 400px;
++}
++
++.stale-title {
++  font-family: var(--font-mono);
++  font-size: 1rem;
++  font-weight: 800;
++  color: var(--accent-orange);
++  margin-bottom: 8px;
++  letter-spacing: 0.1em;
++}
++
++.stale-sub {
++  font-size: 0.85rem;
++  color: var(--text-secondary);
++  margin-bottom: 16px;
++  line-height: 1.4;
++}
++
++.stale-reconnect {
++  background: var(--accent-orange);
++  color: #000;
++  border: none;
++  border-radius: 6px;
++  padding: 8px 24px;
++  font-family: var(--font-mono);
++  font-size: 0.8rem;
++  font-weight: 700;
++  cursor: pointer;
++  text-transform: uppercase;
++  letter-spacing: 0.05em;
++  transition: opacity 0.2s;
++}
++
++.stale-reconnect:hover {
++  opacity: 0.85;
+ }
+\ No newline at end of file
+diff --git a/btc-orderflow/frontend/src/utils/tickSteps.js b/btc-orderflow/frontend/src/utils/tickSteps.js
+index 2469ffc..31771d3 100644
+--- a/btc-orderflow/frontend/src/utils/tickSteps.js
++++ b/btc-orderflow/frontend/src/utils/tickSteps.js
+@@ -8,7 +8,10 @@ export const TICK_STEPS = [
+ ];
+ 
+ export function getTickDecimals(tick) {
+-  const s = Number(tick).toString();
++  const n = Number(tick);
++  if (n <= 0 || !Number.isFinite(n)) return 0;
++  // Handle scientific notation (e.g. 1e-4 ΓåÆ "0.0001")
++  const s = n.toFixed(10).replace(/0+$/, '');
+   if (!s.includes('.')) return 0;
+   const parts = s.split('.');
+   return Math.min(8, parts[1].length);

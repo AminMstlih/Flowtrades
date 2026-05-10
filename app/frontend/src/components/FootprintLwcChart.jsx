@@ -7,7 +7,7 @@ function defaultOptions() {
     sellVol: '#EF5350',
     grid: 'rgba(143, 168, 190, 0.08)',
     gridStrong: 'rgba(143, 168, 190, 0.16)',
-    font: '12px "JetBrains Mono", monospace',
+    font: '12px Inter, sans-serif',
   };
 }
 
@@ -85,8 +85,18 @@ function makeFootprintPaneView() {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
             if (buckets.length > 0) {
               const maxVol = Math.max(options.maxVolumeGlobal || 1, 1);
-              const rowH = Math.max(8, Math.min(24, effectiveBarSpacing * 0.5));
-              const barHeight = Math.max(3, rowH * 0.65);
+
+              // Measure actual vertical row height from price coordinates
+              const sortedPrices = buckets.map(b => Number(b.price)).filter(p => Number.isFinite(p)).sort((a, b) => b - a);
+              let rowH = 16; // fallback
+              if (sortedPrices.length >= 2) {
+                const y0 = priceToCoordinate(sortedPrices[0]);
+                const y1 = priceToCoordinate(sortedPrices[1]);
+                if (y0 !== null && y1 !== null) {
+                  rowH = Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+                }
+              }
+              const barHeight = Math.max(2, rowH * 0.55);
 
               for (const b of buckets) {
                 const price = Number(b.price);
@@ -109,7 +119,7 @@ function makeFootprintPaneView() {
 
                 // volume bars
                 if (leftBar > 0) {
-                  ctx.fillStyle = options.sellVol + 'CC'; // add some transparency
+                  ctx.fillStyle = options.sellVol + 'CC';
                   ctx.fillRect(centerX - 1 - leftBar, y - barHeight / 2, leftBar, barHeight);
                 }
                 if (rightBar > 0) {
@@ -133,7 +143,18 @@ function makeFootprintPaneView() {
           // 4. Footprint Overlay (Numeric detail)
           if (showFootprint && showNumbers) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
-            const rowH = Math.max(8, Math.min(24, effectiveBarSpacing * 0.5));
+            // Measure rowH the same way as section 2
+            const sortedPrices = buckets.map(b => Number(b.price)).filter(p => Number.isFinite(p)).sort((a, b) => b - a);
+            let rowH = 16;
+            if (sortedPrices.length >= 2) {
+              const y0 = priceToCoordinate(sortedPrices[0]);
+              const y1 = priceToCoordinate(sortedPrices[1]);
+              if (y0 !== null && y1 !== null) {
+                rowH = Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+              }
+            }
+
+
             for (const b of buckets) {
               const price = Number(b.price);
               const y = priceToCoordinate(price);
@@ -141,27 +162,28 @@ function makeFootprintPaneView() {
 
               const buy = Number(b.buy_vol) || 0;
               const sell = Number(b.sell_vol) || 0;
-              if (buy + sell <= 0 || rowH <= 10) continue;
+              if (buy + sell <= 0 || rowH <= 8) continue;
 
-              const fontSize = Math.max(9, Math.min(15, rowH * 0.7));
-              ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+              const fontSize = Math.max(8, Math.min(13, rowH * 0.65));
+              ctx.font = `500 ${fontSize}px Inter, sans-serif`;
+              ctx.fontVariantNumeric = 'tabular-nums';
               
               ctx.strokeStyle = '#0D1B2A';
-              ctx.lineWidth = 2.5;
+              ctx.lineWidth = 1.8;
               ctx.lineJoin = 'round';
               
               const sellText = String(Math.round(sell));
               const buyText = String(Math.round(buy));
               
               ctx.textAlign = 'right';
-              ctx.strokeText(sellText, centerX - 4, y);
+              ctx.strokeText(sellText, centerX - 3, y);
               ctx.fillStyle = '#FFFFFF'; 
-              ctx.fillText(sellText, centerX - 4, y);
+              ctx.fillText(sellText, centerX - 3, y);
               
               ctx.textAlign = 'left';
-              ctx.strokeText(buyText, centerX + 4, y);
+              ctx.strokeText(buyText, centerX + 3, y);
               ctx.fillStyle = '#FFFFFF';
-              ctx.fillText(buyText, centerX + 4, y);
+              ctx.fillText(buyText, centerX + 3, y);
             }
           }
         }
@@ -202,6 +224,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
   const isProgrammaticChangeRef = useRef(false);
   const lastFirstCandleTimeRef = useRef(null);
   const lastCandleCountRef = useRef(0);
+  const lastTickSizeRef = useRef(null);
 
   const mapCandle = useCallback((c) => ({
     time: c.time || c.ts || c.start_time || c.open_time || Math.floor((c.timestamp || Date.now()) / 1000),
@@ -275,7 +298,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
         if (logicalRange && currentCandles.length > 0) {
           const visibleCandles = Math.max(1, logicalRange.to - logicalRange.from);
           const totalWidthPx = chart.timeScale().width();
-          const barSpacing = totalWidthPx / visibleCandles;
+          let exactBarSpacing = totalWidthPx / visibleCandles;
 
           // Find a visible candle to get a reliable coordinate
           const firstVisibleIndex = Math.max(0, Math.floor(logicalRange.from));
@@ -284,16 +307,25 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
           const mappedSafeCandle = mapCandle(currentCandles[safeIndex]);
           const safeX = chart.timeScale().timeToCoordinate(mappedSafeCandle.time);
 
+          // Get EXACT bar spacing directly from LWC's coordinate system to avoid fractional drifting
+          if (safeIndex + 1 < currentCandles.length) {
+            const nextX = chart.timeScale().timeToCoordinate(mapCandle(currentCandles[safeIndex + 1]).time);
+            if (safeX !== null && nextX !== null) exactBarSpacing = nextX - safeX;
+          } else if (safeIndex - 1 >= 0) {
+            const prevX = chart.timeScale().timeToCoordinate(mapCandle(currentCandles[safeIndex - 1]).time);
+            if (safeX !== null && prevX !== null) exactBarSpacing = safeX - prevX;
+          }
+
           if (safeX !== null) {
-            // Calculate where index 0 would be
-            const firstX = safeX - safeIndex * barSpacing;
+            // Calculate where index 0 would be using exact spacing
+            const firstX = safeX - safeIndex * exactBarSpacing;
             // We want the center of Delta cell 0 to align with firstX
-            const offsetX = firstX - barSpacing / 2;
+            const offsetX = firstX - exactBarSpacing / 2;
 
             onViewportChangeRef.current({ 
               offsetX, 
-              barSpacing,
-              scaleX: Math.max(0.75, barSpacing / 105) // Fallback for components still using scale
+              barSpacing: exactBarSpacing,
+              scaleX: Math.max(0.75, exactBarSpacing / 105) // Fallback for components still using scale
             });
           }
         }
@@ -320,8 +352,15 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     const isHistoryShift = lastFirstCandleTimeRef.current !== firstCandleTime;
     const isMajorCountChange = Math.abs(candles.length - lastCandleCountRef.current) > 1;
 
+    // Detect tick size changes by checking if aggBuckets structure changed
+    // We use maxVolumeGlobal as a proxy — when tick size changes, aggregation produces different volumes
+    const tickSizeChanged = lastTickSizeRef.current !== null && lastTickSizeRef.current !== maxVolumeGlobal;
+    // More reliable: check if first candle's aggBuckets count changed
+    const firstBucketsCount = candles[0]?.aggBuckets?.length || 0;
+    const bucketsChanged = candles.length > 0 && firstBucketsCount > 0;
+
     // If it's a completely new dataset, history shifted (pruned), or tick size changed
-    if (!hasInitializedRef.current || isHistoryShift || isMajorCountChange) {
+    if (!hasInitializedRef.current || isHistoryShift || isMajorCountChange || tickSizeChanged) {
       const allMapped = candles.map(mapCandle);
       seriesRef.current.setData(allMapped);
 
@@ -340,6 +379,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
 
     lastFirstCandleTimeRef.current = firstCandleTime;
     lastCandleCountRef.current = candles.length;
+    lastTickSizeRef.current = maxVolumeGlobal;
   }, [candles, mapCandle, maxVolumeGlobal]);
 
   // Handle explicit Auto-Fit trigger from parent
