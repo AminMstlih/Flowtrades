@@ -28,8 +28,8 @@ function makeFootprintPaneView() {
       const laneWidth = Math.max(6, effectiveBarSpacing * 0.9);
 
       // Define zoom levels based on laneWidth (approximate transition points)
-      const showFootprint = laneWidth > 18;
-      const showNumbers = laneWidth > 48;
+      const showFootprint = laneWidth > 20;
+      const showNumbers = laneWidth > 75;
 
       target.useBitmapCoordinateSpace((scope) => {
         const ctx = scope.context;
@@ -155,6 +155,12 @@ function makeFootprintPaneView() {
             }
 
 
+            // Protect horizontal boundaries: ensure text doesn't bleed into adjacent candles
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(centerX - laneWidth / 2, 0, laneWidth, scope.bitmapSize.height);
+            ctx.clip();
+
             for (const b of buckets) {
               const price = Number(b.price);
               const y = priceToCoordinate(price);
@@ -164,12 +170,13 @@ function makeFootprintPaneView() {
               const sell = Number(b.sell_vol) || 0;
               if (buy + sell <= 0 || rowH <= 8) continue;
 
-              const fontSize = Math.max(8, Math.min(13, rowH * 0.65));
+              // Scale font size by both row height AND lane width to prevent overlaps
+              const fontSize = Math.max(7, Math.min(13, rowH * 0.6, laneWidth * 0.14));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
               ctx.strokeStyle = '#0D1B2A';
-              ctx.lineWidth = 1.8;
+              ctx.lineWidth = 1.6;
               ctx.lineJoin = 'round';
               
               const sellText = String(Math.round(sell));
@@ -185,6 +192,7 @@ function makeFootprintPaneView() {
               ctx.fillStyle = '#FFFFFF';
               ctx.fillText(buyText, centerX + 3, y);
             }
+            ctx.restore();
           }
 
           // 5. Badges / Flags (Absorption, Exhaustion, Imbalance)

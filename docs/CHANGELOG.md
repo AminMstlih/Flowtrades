@@ -70,3 +70,8 @@ What We Implemented:
 ✅ **Auto-Fit & Tick-Size Synchronization**
 - Bound Tick Size and Auto-Fit directly to `maxVolumeGlobal` data refetches.
 - Changes to Tick Size now instantly trigger a complete `setData()` historical repaint of all footprints rather than just replacing live candles.
+
+✅ **Final Visual & Data Polish**
+- **Date/Time Fix**: Corrected the Unix timestamp conversion logic in the frontend to handle millisecond precision, ensuring the chart displays the correct current date (May 2026) instead of September 2024.
+- **Anti-Overlap Logic**: Implemented adaptive font scaling and per-lane clipping regions. Text now hides gracefully when zooming out and is strictly confined to its candle boundary, preventing visual "bleeding" between adjacent footprints.
+- **Default State**: Set `showBadges` to `false` by default for a cleaner initial dashboard experience.
