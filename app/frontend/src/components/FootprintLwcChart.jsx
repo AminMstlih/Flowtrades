@@ -186,6 +186,54 @@ function makeFootprintPaneView() {
               ctx.fillText(buyText, centerX + 3, y);
             }
           }
+
+          // 5. Badges / Flags (Absorption, Exhaustion, Imbalance)
+          if (showFootprint && options.showBadges !== false) {
+            const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
+            for (const b of buckets) {
+              if (!b.flags || b.flags.length === 0) continue;
+              
+              const price = Number(b.price);
+              const y = priceToCoordinate(price);
+              if (y === null) continue;
+
+              // Draw badges outside the right edge of the candle body
+              let offsetX = centerX + bodyWidth / 2 + 6;
+              
+              for (const flag of b.flags) {
+                // Ensure opacity is visible but reflects confidence (severity 1..10 -> opacity 0.3..1.0)
+                const opacity = Math.min(1, Math.max(0.3, (flag.severity || 5) / 10));
+                
+                let bgColor = `rgba(100, 100, 100, ${opacity})`;
+                
+                if (flag.type === 'IMB') {
+                  bgColor = flag.direction === 'buy' ? `rgba(38, 166, 154, ${opacity})` : `rgba(239, 83, 80, ${opacity})`;
+                } else if (flag.type === 'ABS') {
+                  bgColor = `rgba(249, 168, 37, ${opacity})`; // Orange
+                } else if (flag.type === 'EXH') {
+                  bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
+                }
+                
+                ctx.font = `600 9px Inter, sans-serif`;
+                const textWidth = ctx.measureText(flag.type).width;
+                const paddingX = 4;
+                const paddingY = 2;
+                const boxWidth = textWidth + paddingX * 2;
+                const boxHeight = 14;
+                
+                ctx.fillStyle = bgColor;
+                ctx.beginPath();
+                ctx.roundRect(offsetX, y - boxHeight / 2, boxWidth, boxHeight, 3);
+                ctx.fill();
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.fillText(flag.type, offsetX + boxWidth / 2, y + 3);
+                
+                offsetX += boxWidth + 4; // Spacing for next badge
+              }
+            }
+          }
         }
 
         ctx.restore();
@@ -216,7 +264,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -225,15 +273,22 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
   const lastFirstCandleTimeRef = useRef(null);
   const lastCandleCountRef = useRef(0);
   const lastTickSizeRef = useRef(null);
+  const lastShowBadgesRef = useRef(null);
 
-  const mapCandle = useCallback((c) => ({
-    time: c.time || c.ts || c.start_time || c.open_time || Math.floor((c.timestamp || Date.now()) / 1000),
-    open: Number(c.open),
-    high: Number(c.high),
-    low: Number(c.low),
-    close: Number(c.close),
-    aggBuckets: c.aggBuckets || [],
-  }), []);
+  const mapCandle = useCallback((c) => {
+    let rawTime = c.time || c.ts || c.start_time || c.open_time || c.timestamp || Math.floor(Date.now() / 1000);
+    // Lightweight Charts expects seconds. If value is > 10^11, it's likely milliseconds.
+    const time = rawTime > 10000000000 ? Math.floor(rawTime / 1000) : rawTime;
+
+    return {
+      time,
+      open: Number(c.open),
+      high: Number(c.high),
+      low: Number(c.low),
+      close: Number(c.close),
+      aggBuckets: c.aggBuckets || [],
+    };
+  }, []);
 
   const candlesRef = useRef(candles);
   useEffect(() => {
@@ -345,7 +400,8 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
 
     // Apply any updated global volume option securely
     seriesRef.current.applyOptions({
-      maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1)
+      maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
+      showBadges: showBadges
     });
 
     const firstCandleTime = mapCandle(candles[0]).time;
@@ -355,12 +411,12 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     // Detect tick size changes by checking if aggBuckets structure changed
     // We use maxVolumeGlobal as a proxy — when tick size changes, aggregation produces different volumes
     const tickSizeChanged = lastTickSizeRef.current !== null && lastTickSizeRef.current !== maxVolumeGlobal;
-    // More reliable: check if first candle's aggBuckets count changed
-    const firstBucketsCount = candles[0]?.aggBuckets?.length || 0;
-    const bucketsChanged = candles.length > 0 && firstBucketsCount > 0;
+    
+    // Detect badge toggle
+    const badgesToggled = lastShowBadgesRef.current !== null && lastShowBadgesRef.current !== showBadges;
 
-    // If it's a completely new dataset, history shifted (pruned), or tick size changed
-    if (!hasInitializedRef.current || isHistoryShift || isMajorCountChange || tickSizeChanged) {
+    // If it's a completely new dataset, history shifted (pruned), tick size changed, or badges toggled
+    if (!hasInitializedRef.current || isHistoryShift || isMajorCountChange || tickSizeChanged || badgesToggled) {
       const allMapped = candles.map(mapCandle);
       seriesRef.current.setData(allMapped);
 
@@ -380,7 +436,8 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     lastFirstCandleTimeRef.current = firstCandleTime;
     lastCandleCountRef.current = candles.length;
     lastTickSizeRef.current = maxVolumeGlobal;
-  }, [candles, mapCandle, maxVolumeGlobal]);
+    lastShowBadgesRef.current = showBadges;
+  }, [candles, mapCandle, maxVolumeGlobal, showBadges]);
 
   // Handle explicit Auto-Fit trigger from parent
   useEffect(() => {

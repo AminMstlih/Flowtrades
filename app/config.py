@@ -45,9 +45,11 @@ class AggregationConfig(BaseModel):
 
 
 class DetectionConfig(BaseModel):
-    imbalance_threshold_pct: float = Field(default=70, ge=0, le=100)
-    min_volume_per_bucket_btc: float = Field(default=0.5, ge=0)
-    absorption_vol_percentile: float = Field(default=80, ge=0, le=100)
+    imbalance_threshold_pct: float = Field(default=85, ge=0, le=100)
+    min_bucket_weight_pct: float = Field(default=5.0, ge=0, le=100)
+    min_trades_per_bucket: int = Field(default=3, ge=1)
+    min_volume_per_bucket_btc: float = Field(default=0.1, ge=0)
+    absorption_vol_percentile: float = Field(default=90, ge=0, le=100)
     absorption_price_pct: float = Field(default=0.05, ge=0)
 
 

@@ -31,9 +31,11 @@ class FootprintState:
         self,
         bucket_size: float = 1.0,
         window_seconds: int = 300,
-        min_volume_btc: float = 0.5,
-        imbalance_threshold_pct: float = 70.0,
-        absorption_vol_percentile: float = 80.0,
+        min_volume_btc: float = 0.1,
+        imbalance_threshold_pct: float = 85.0,
+        min_bucket_weight_pct: float = 5.0,
+        min_trades_per_bucket: int = 3,
+        absorption_vol_percentile: float = 90.0,
         absorption_price_pct: float = 0.05,
     ) -> None:
         self.charts = {
@@ -51,6 +53,8 @@ class FootprintState:
         self.detector = DetectionEngine(
             imbalance_threshold_pct=imbalance_threshold_pct,
             min_volume_per_bucket_btc=min_volume_btc,
+            min_bucket_weight_pct=min_bucket_weight_pct,
+            min_trades_per_bucket=min_trades_per_bucket,
             absorption_vol_percentile=absorption_vol_percentile,
             absorption_price_pct=absorption_price_pct,
         )

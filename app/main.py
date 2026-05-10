@@ -98,6 +98,8 @@ async def main() -> None:
         window_seconds=window_seconds,
         min_volume_btc=config.detection.min_volume_per_bucket_btc,
         imbalance_threshold_pct=config.detection.imbalance_threshold_pct,
+        min_bucket_weight_pct=config.detection.min_bucket_weight_pct,
+        min_trades_per_bucket=config.detection.min_trades_per_bucket,
         absorption_vol_percentile=config.detection.absorption_vol_percentile,
         absorption_price_pct=config.detection.absorption_price_pct,
     )

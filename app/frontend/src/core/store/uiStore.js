@@ -5,7 +5,7 @@ export const useUIStore = create((set) => ({
   tickMode: 'auto',
   autoFit: true,
   timeframeWindow: 5,
-  showBadges: true,
+  showBadges: false,
   viewportScroll: { scrollX: 0, scaleX: 1, barSpacing: 105, offsetX: 0 },
 
   setTickSize: (size) => set({ tickSize: size }),

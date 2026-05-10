@@ -7,6 +7,9 @@ Implements three detection types per architecture doc Section 4:
 3. Exhaustion: volume spike followed by counter-pressure reversal
 
 These are contextual annotations, NOT trading signals.
+
+v2: Uses RELATIVE thresholds (% of candle volume) instead of fixed absolute
+    minimums. This scales correctly across timeframes and market conditions.
 """
 
 from __future__ import annotations
@@ -57,31 +60,25 @@ class DetectionEngine:
     """
     Runs pattern detection on footprint candles.
     
-    Stateless — takes a candle, returns a dict mapping bucket prices
-    to their detection flags.
+    v2: All thresholds are relative to candle volume, not fixed absolutes.
+    This means the engine works equally well on 1m and 1h candles.
     """
 
     def __init__(
         self,
-        imbalance_threshold_pct: float = 70.0,
-        min_volume_per_bucket_btc: float = 0.5,
-        absorption_vol_percentile: float = 80.0,
+        imbalance_threshold_pct: float = 85.0,
+        min_bucket_weight_pct: float = 5.0,
+        min_trades_per_bucket: int = 3,
+        absorption_vol_percentile: float = 90.0,
         absorption_price_pct: float = 0.05,
         exhaustion_spike_percentile: float = 90.0,
         exhaustion_counter_pct: float = 40.0,
+        # Legacy compat — kept but no longer primary filter
+        min_volume_per_bucket_btc: float = 0.1,
     ) -> None:
-        """
-        Initialize detection engine with thresholds from config.
-        
-        Args:
-            imbalance_threshold_pct: Min imbalance % to flag (default 70).
-            min_volume_per_bucket_btc: Min BTC volume to qualify for detection.
-            absorption_vol_percentile: Volume percentile threshold for absorption.
-            absorption_price_pct: Max price movement % for absorption (default 0.05%).
-            exhaustion_spike_percentile: Volume percentile for exhaustion spike.
-            exhaustion_counter_pct: Min counter-pressure % for exhaustion reversal.
-        """
         self.imbalance_threshold_pct = imbalance_threshold_pct
+        self.min_bucket_weight_pct = min_bucket_weight_pct
+        self.min_trades_per_bucket = min_trades_per_bucket
         self.min_volume_btc = min_volume_per_bucket_btc
         self.absorption_vol_percentile = absorption_vol_percentile
         self.absorption_price_pct = absorption_price_pct
@@ -92,38 +89,65 @@ class DetectionEngine:
         """
         Run all detection algorithms on a single candle.
         
-        Args:
-            candle: A FootprintCandle with populated buckets.
-            
         Returns:
             Dict mapping bucket price -> list of DetectionFlags.
-            Empty list if no detections for that bucket.
         """
         flags: dict[float, list[DetectionFlag]] = {price: [] for price in candle.buckets}
 
         if not candle.buckets:
             return flags
 
+        candle_total_vol = candle.total_vol
+        if candle_total_vol <= 0:
+            return flags
+
         # Run detections in priority order
-        self._detect_imbalance(candle, flags)
-        self._detect_absorption(candle, flags)
-        self._detect_exhaustion(candle, flags)
+        self._detect_imbalance(candle, flags, candle_total_vol)
+        self._detect_absorption(candle, flags, candle_total_vol)
+        self._detect_exhaustion(candle, flags, candle_total_vol)
 
         return flags
+
+    def _bucket_qualifies(self, bucket: PriceBucket, candle_total_vol: float) -> bool:
+        """Check if a bucket has enough weight to be worth analyzing."""
+        if bucket.total_vol <= 0:
+            return False
+        # Must have minimum trade count (not just 1 whale order)
+        if bucket.trade_count < self.min_trades_per_bucket:
+            return False
+        # Must represent a meaningful % of candle volume
+        weight_pct = (bucket.total_vol / candle_total_vol) * 100.0
+        if weight_pct < self.min_bucket_weight_pct:
+            return False
+        # Absolute floor as safety net
+        if bucket.total_vol < self.min_volume_btc:
+            return False
+        return True
+
+    def _confidence_factor(self, bucket: PriceBucket, candle_total_vol: float) -> float:
+        """
+        Calculate confidence 0.0-1.0 based on how much volume supports this signal.
+        More volume in the candle = higher confidence in the pattern.
+        Used to scale severity so early-candle signals are dimmer.
+        """
+        weight = bucket.total_vol / max(candle_total_vol, 0.001)
+        # Sigmoid-ish: ramps up from ~0.3 at 5% weight to ~1.0 at 30%+ weight
+        return min(1.0, max(0.2, weight * 4.0))
 
     def _detect_imbalance(
         self,
         candle: FootprintCandle,
         flags: dict[float, list[DetectionFlag]],
+        candle_total_vol: float,
     ) -> None:
         """
         Imbalance Detection — Section 4.1.
         
         Flags buckets where one side dominates by imbalance_threshold_pct.
-        Requires minimum volume to filter noise on thin levels.
+        Now requires relative volume weight + minimum trade count.
         """
         for price, bucket in candle.buckets.items():
-            if bucket.total_vol < self.min_volume_btc:
+            if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
 
             imbalance = bucket.imbalance_pct
@@ -135,10 +159,14 @@ class DetectionEngine:
                 continue
 
             direction = "buy" if imbalance > 0 else "sell"
+            confidence = self._confidence_factor(bucket, candle_total_vol)
             
-            # Severity scales from threshold to 100%
-            # 70% = severity 1, 100% = severity 10
-            severity = min(10.0, max(1.0, (abs_imbalance - self.imbalance_threshold_pct) / 3.0 + 1.0))
+            # Severity: scales with both imbalance strength and confidence
+            raw_severity = (abs_imbalance - self.imbalance_threshold_pct) / (100.0 - self.imbalance_threshold_pct) * 8.0 + 2.0
+            severity = min(10.0, max(1.0, raw_severity * confidence))
+
+            if severity < 4.0:
+                continue
 
             flags[price].append(DetectionFlag(
                 type=DetectionType.IMBALANCE,
@@ -150,6 +178,9 @@ class DetectionEngine:
                     "buy_vol": round(bucket.buy_vol, 4),
                     "sell_vol": round(bucket.sell_vol, 4),
                     "total_vol": round(bucket.total_vol, 4),
+                    "weight_pct": round((bucket.total_vol / candle_total_vol) * 100, 1),
+                    "trade_count": bucket.trade_count,
+                    "confidence": round(confidence, 2),
                 },
             ))
 
@@ -157,6 +188,7 @@ class DetectionEngine:
         self,
         candle: FootprintCandle,
         flags: dict[float, list[DetectionFlag]],
+        candle_total_vol: float,
     ) -> None:
         """
         Absorption Detection — Section 4.2.
@@ -167,41 +199,39 @@ class DetectionEngine:
         if not candle.buckets:
             return
 
-        # Calculate volume threshold from percentile
-        volumes = [b.total_vol for b in candle.buckets.values()]
+        volumes = [b.total_vol for b in candle.buckets.values() if b.total_vol > 0]
         if len(volumes) < 2:
             return
 
         vol_threshold = self._percentile(volumes, self.absorption_vol_percentile)
 
-        # Price range check: if candle range is small relative to price,
-        # high-volume buckets are absorption
         if candle.high <= candle.low or candle.high is None or candle.low is None:
             return
 
         price_range_pct = ((candle.high - candle.low) / candle.high) * 100.0
 
         for price, bucket in candle.buckets.items():
-            if bucket.total_vol < self.min_volume_btc:
+            if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
             if bucket.total_vol < vol_threshold:
                 continue
 
             # Absorption: high volume + low overall price movement
-            if price_range_pct > self.absorption_price_pct * 10:  # Allow 10x threshold for candle-level
-                # Also check bucket-level: if this single bucket has high volume
-                # but price hasn't moved much, it's still absorption
+            if price_range_pct > self.absorption_price_pct * 10:
                 bucket_price_range = (candle.high - candle.low) / price
                 if bucket_price_range > self.absorption_price_pct / 100.0:
                     continue
 
-            # Severity based on volume relative to threshold
+            confidence = self._confidence_factor(bucket, candle_total_vol)
             vol_ratio = bucket.total_vol / vol_threshold
-            severity = min(10.0, max(1.0, vol_ratio * 3.0))
+            severity = min(10.0, max(1.0, vol_ratio * 3.0 * confidence))
+
+            if severity < 4.0:
+                continue
 
             flags[price].append(DetectionFlag(
                 type=DetectionType.ABSORPTION,
-                direction=None,  # Absorption is neutral — both sides present
+                direction=None,
                 severity=round(severity, 1),
                 label="High volume, low movement — large player may be defending this level",
                 metadata={
@@ -209,6 +239,7 @@ class DetectionEngine:
                     "vol_threshold": round(vol_threshold, 4),
                     "price_range_pct": round(price_range_pct, 4),
                     "vol_ratio": round(vol_ratio, 2),
+                    "confidence": round(confidence, 2),
                 },
             ))
 
@@ -216,56 +247,49 @@ class DetectionEngine:
         self,
         candle: FootprintCandle,
         flags: dict[float, list[DetectionFlag]],
+        candle_total_vol: float,
     ) -> None:
         """
         Exhaustion Detection — Section 4.3.
         
-        Flags volume spikes in one direction followed by significant
-        counter-pressure. Indicates momentum weakening.
-        
-        This detection requires time-series awareness within a candle,
-        which we approximate by checking if a bucket has significant
-        volume from both sides (indicating the fight happened).
+        Flags volume spikes with significant counter-pressure.
+        Indicates momentum weakening.
         """
         if not candle.buckets:
             return
 
-        # Calculate spike threshold
-        volumes = [b.total_vol for b in candle.buckets.values()]
+        volumes = [b.total_vol for b in candle.buckets.values() if b.total_vol > 0]
         if len(volumes) < 3:
             return
 
         spike_threshold = self._percentile(volumes, self.exhaustion_spike_percentile)
 
         for price, bucket in candle.buckets.items():
-            if bucket.total_vol < self.min_volume_btc:
+            if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
             if bucket.total_vol < spike_threshold:
                 continue
 
-            # Exhaustion: significant volume from BOTH sides
-            # This indicates a fight — one side spiked, then the other countered
             buy_pct = (bucket.buy_vol / bucket.total_vol) * 100.0
             sell_pct = (bucket.sell_vol / bucket.total_vol) * 100.0
 
-            # Both sides must have meaningful presence (neither dominates completely)
-            # AND the counter-pressure must be above exhaustion_counter_pct
+            # Must NOT be one-sided (that's imbalance, not exhaustion)
             if buy_pct > 90 or sell_pct > 90:
-                # One side completely dominated — not exhaustion, it's imbalance
                 continue
 
-            # The weaker side must be strong enough to indicate counter-pressure
             weaker_pct = min(buy_pct, sell_pct)
             if weaker_pct < self.exhaustion_counter_pct:
                 continue
 
-            # Determine which side spiked first (approximation: use the dominant side)
             dominant_side = "buy" if buy_pct > sell_pct else "sell"
+            confidence = self._confidence_factor(bucket, candle_total_vol)
             
-            # Severity based on how close the fight is and total volume
-            closeness = 50.0 - abs(buy_pct - 50.0)  # 0 = complete domination, 50 = perfect split
+            closeness = 50.0 - abs(buy_pct - 50.0)
             vol_factor = min(1.0, bucket.total_vol / (spike_threshold * 2))
-            severity = min(10.0, max(1.0, (closeness / 10.0) + (vol_factor * 3.0)))
+            severity = min(10.0, max(1.0, ((closeness / 10.0) + (vol_factor * 3.0)) * confidence))
+
+            if severity < 4.0:
+                continue
 
             flags[price].append(DetectionFlag(
                 type=DetectionType.EXHAUSTION,
@@ -277,6 +301,7 @@ class DetectionEngine:
                     "buy_pct": round(buy_pct, 1),
                     "sell_pct": round(sell_pct, 1),
                     "spike_threshold": round(spike_threshold, 4),
+                    "confidence": round(confidence, 2),
                 },
             ))
 

@@ -73,7 +73,7 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
 
           <div
             className={`auto-fit-badge ${showBadges ? 'active' : 'inactive'}`}
-            onClick={() => setShowBadges(prev => !prev)}
+            onClick={() => setShowBadges(!showBadges)}
             title="Press 'B' to toggle"
             style={{ marginLeft: '8px' }}
           >

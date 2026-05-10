@@ -14,14 +14,20 @@ time_windows_minutes = [1, 5, 15]
 default_window = 5
 
 [detection]
-# Minimum imbalance % to highlight a bucket
-imbalance_threshold_pct = 70
+# Minimum imbalance % to highlight a bucket (raised from 70 → 85 to reduce noise)
+imbalance_threshold_pct = 85
 
-# Minimum BTC volume to qualify bucket for imbalance display
-min_volume_per_bucket_btc = 0.5
+# Minimum % of candle volume a bucket must represent to qualify for any badge
+min_bucket_weight_pct = 10.0
 
-# Volume percentile threshold for absorption flag
-absorption_vol_percentile = 80
+# Minimum trade count per bucket (filters single whale orders)
+min_trades_per_bucket = 3
+
+# Absolute floor — safety net, not primary filter
+min_volume_per_bucket_btc = 0.1
+
+# Volume percentile threshold for absorption flag (top 10% only)
+absorption_vol_percentile = 90
 
 # Max price movement % to confirm absorption
 absorption_price_pct = 0.05
