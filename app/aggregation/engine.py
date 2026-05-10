@@ -73,12 +73,16 @@ class FootprintCandle:
     
     buckets: dict[float, PriceBucket] = field(default_factory=dict)
     
-    def add_trade(self, price: float, volume: float, side: str, bucket_size: float) -> None:
-        if self.open is None:
-            self.open = price
-        self.high = max(self.high, price)
-        self.low = min(self.low, price)
-        self.close = price
+    def add_trade(self, price: float, volume: float, side: str, bucket_size: float, is_primary: bool = True) -> None:
+        # Strict anchoring: Only the primary exchange defines the OHLC boundaries
+        # This prevents the candle body from tearing apart due to inter-exchange price differences
+        if is_primary or self.open is None:
+            if self.open is None:
+                self.open = price
+            self.high = max(self.high, price)
+            self.low = min(self.low, price)
+            self.close = price
+            
         self.trade_count += 1
         
         if side == "buy":
@@ -110,17 +114,19 @@ class FootprintChart:
     Manages the ongoing active candle and a history of sealed candles.
     """
 
-    def __init__(self, bucket_size: float = 1.0, interval_seconds: int = 300, max_candles: int = 50) -> None:
+    def __init__(self, bucket_size: float = 1.0, interval_seconds: int = 300, max_candles: int = 50, primary_exchange: str = "binance") -> None:
         if bucket_size <= 0:
             raise ValueError(f"bucket_size must be positive, got {bucket_size}")
         self.bucket_size = bucket_size
         self.interval_ms = interval_seconds * 1000
         self.max_candles = max_candles
+        self.primary_exchange = primary_exchange
         
         self.active_candle: FootprintCandle | None = None
         self.historical_candles: deque[FootprintCandle] = deque(maxlen=max_candles)
 
-    def add_trade(self, ts_ms: int, price: float, volume: float, side: str) -> None:
+    def add_trade(self, ts_ms: int, price: float, volume: float, side: str, **kwargs) -> None:
+
         """
         Route a trade to the correct candle, sealing the old one if time crossed the boundary.
         """
@@ -150,7 +156,12 @@ class FootprintChart:
             )
             return
             
-        active.add_trade(price, volume, side, self.bucket_size)
+        # Optional param 'exchange' allows checking if the trade came from the primary path
+        exchange = kwargs.get("exchange", "")
+        # If no primary exchange specified, or it matches, it's considered primary
+        is_primary = (exchange == self.primary_exchange) if exchange and self.primary_exchange else True
+            
+        active.add_trade(price, volume, side, self.bucket_size, is_primary)
         self.active_candle = active
 
     def get_snapshot(self) -> list[FootprintCandle]:
