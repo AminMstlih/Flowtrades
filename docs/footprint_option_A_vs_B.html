@@ -1,0 +1,321 @@
+
+<style>
+  .section-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin: 0 0 8px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .option-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 4px; }
+  .option-sub { font-size: 12px; color: var(--color-text-secondary); margin: 0 0 12px; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 16px; }
+  canvas { display: block; width: 100%; }
+  .tab-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn { font-size: 13px; padding: 6px 14px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+  .tab-btn.active { background: var(--color-background-secondary); color: var(--color-text-primary); font-weight: 500; border-color: var(--color-border-primary); }
+  .zoom-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .zoom-row label { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+  .zoom-row input { flex: 1; }
+  .zoom-val { font-size: 12px; font-weight: 500; color: var(--color-text-primary); min-width: 28px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-text-secondary); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+
+<h2 class="sr-only">Interactive comparison of footprint chart Option A (inside candle) vs Option B (side-anchored) with zoom slider</h2>
+
+<div style="padding: 0.5rem 0;">
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="setOption('A')">Option A — footprint inside candle</button>
+    <button class="tab-btn" onclick="setOption('B')">Option B — side-anchored panel</button>
+  </div>
+
+  <div class="card">
+    <p class="option-title" id="opt-title">Option A — footprint inside candle body</p>
+    <p class="option-sub" id="opt-sub">Volume numbers sit directly on the candle, left = bid, right = ask. The candle IS the footprint.</p>
+    <canvas id="chartCanvas" height="320"></canvas>
+    <div class="zoom-row">
+      <label>Zoom</label>
+      <input type="range" min="1" max="3" step="0.1" value="2" id="zoomSlider" oninput="onZoom(this.value)">
+      <span class="zoom-val" id="zoomVal">mid</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div>bullish candle</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#D85A30"></div>bearish candle</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div>ask (buy)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#D4537E"></div>bid (sell)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F0995550"></div>imbalance</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentOption = 'A';
+let zoomLevel = 2;
+
+const candles = [
+  { open: 42200, high: 42850, low: 41900, close: 42700, color: 'bull',
+    footprint: [
+      { price: 42800, bid: 12, ask: 45 },
+      { price: 42600, bid: 88, ask: 34 },
+      { price: 42400, bid: 210, ask: 190 },
+      { price: 42200, bid: 67, ask: 120 },
+      { price: 42000, bid: 30, ask: 22 },
+    ]
+  },
+  { open: 42700, high: 43100, low: 42300, close: 42450, color: 'bear',
+    footprint: [
+      { price: 43000, bid: 55, ask: 18 },
+      { price: 42800, bid: 145, ask: 60 },
+      { price: 42600, bid: 190, ask: 170 },
+      { price: 42400, bid: 95, ask: 40 },
+      { price: 42200, bid: 28, ask: 55 },
+    ]
+  },
+  { open: 42450, high: 43200, low: 42100, close: 43050, color: 'bull',
+    footprint: [
+      { price: 43100, bid: 22, ask: 78 },
+      { price: 42900, bid: 60, ask: 200 },
+      { price: 42700, bid: 140, ask: 155 },
+      { price: 42500, bid: 88, ask: 95 },
+      { price: 42300, bid: 35, ask: 18 },
+    ]
+  },
+];
+
+function onZoom(val) {
+  zoomLevel = parseFloat(val);
+  const label = val < 1.5 ? 'far out' : val < 2.2 ? 'mid' : 'zoomed in';
+  document.getElementById('zoomVal').textContent = label;
+  draw();
+}
+
+function setOption(opt) {
+  currentOption = opt;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0 && opt==='A') || (i===1 && opt==='B')));
+  if (opt === 'A') {
+    document.getElementById('opt-title').textContent = 'Option A — footprint inside candle body';
+    document.getElementById('opt-sub').textContent = 'Volume numbers sit directly on the candle, left = bid, right = ask. The candle IS the footprint.';
+  } else {
+    document.getElementById('opt-title').textContent = 'Option B — side-anchored microgrid per candle';
+    document.getElementById('opt-sub').textContent = 'Each candle has its own attached footprint panel beside it. Price ladder rows align to the right of each bar.';
+  }
+  draw();
+}
+
+function draw() {
+  const canvas = document.getElementById('chartCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32;
+  canvas.width = W * dpr;
+  canvas.height = 320 * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = '320px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const isDark = document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const textColor = isDark ? '#e5e4e0' : '#2C2C2A';
+  const mutedColor = isDark ? '#888780' : '#888780';
+  const bgLine = isDark ? '#3a3a38' : '#e8e6e0';
+  const bullColor = '#1D9E75';
+  const bearColor = '#D85A30';
+  const askColor = '#378ADD';
+  const bidColor = '#D4537E';
+  const imbColor = 'rgba(240,153,85,0.25)';
+
+  ctx.clearRect(0, 0, W, 320);
+
+  const priceMin = 41800, priceMax = 43300;
+  const priceRange = priceMax - priceMin;
+
+  function priceToY(p) {
+    return 20 + ((priceMax - p) / priceRange) * 260;
+  }
+
+  const numCandles = candles.length;
+
+  if (currentOption === 'A') {
+    const candleW = zoomLevel < 1.5 ? 40 : zoomLevel < 2.2 ? 70 : 100;
+    const spacing = candleW + (zoomLevel < 1.5 ? 20 : 30);
+    const startX = (W - numCandles * spacing) / 2;
+    const showFootprint = zoomLevel > 1.3;
+    const showNumbers = zoomLevel > 1.8;
+
+    candles.forEach((c, i) => {
+      const x = startX + i * spacing + spacing / 2;
+      const yOpen = priceToY(c.open);
+      const yClose = priceToY(c.close);
+      const yHigh = priceToY(c.high);
+      const yLow = priceToY(c.low);
+      const color = c.color === 'bull' ? bullColor : bearColor;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyBot = Math.max(yOpen, yClose);
+      const bodyH = Math.max(bodyBot - bodyTop, 4);
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, yHigh); ctx.lineTo(x, yLow); ctx.stroke();
+
+      if (showFootprint) {
+        const fp = c.footprint;
+        const tickH = bodyH / fp.length;
+        fp.forEach((row, ri) => {
+          const ry = bodyTop + ri * tickH;
+          const maxVol = 210;
+          const bidW = (row.bid / maxVol) * (candleW * 0.42);
+          const askW = (row.ask / maxVol) * (candleW * 0.42);
+          const imbalance = row.ask > row.bid * 2 || row.bid > row.ask * 2;
+
+          if (imbalance) {
+            ctx.fillStyle = imbColor;
+            ctx.fillRect(x - candleW/2, ry, candleW, tickH);
+          }
+
+          ctx.fillStyle = bidColor + 'cc';
+          ctx.fillRect(x - bidW - 1, ry + 1, bidW, tickH - 2);
+          ctx.fillStyle = askColor + 'cc';
+          ctx.fillRect(x + 1, ry + 1, askW, tickH - 2);
+
+          if (showNumbers && tickH > 10) {
+            ctx.fillStyle = textColor;
+            ctx.font = `${Math.max(8, Math.min(11, tickH * 0.55))}px monospace`;
+            ctx.textAlign = 'right';
+            ctx.fillText(row.bid, x - 2, ry + tickH * 0.72);
+            ctx.textAlign = 'left';
+            ctx.fillText(row.ask, x + 2, ry + tickH * 0.72);
+          }
+
+          ctx.strokeStyle = bgLine;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(x - candleW/2, ry); ctx.lineTo(x + candleW/2, ry); ctx.stroke();
+        });
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - candleW/2, bodyTop, candleW, bodyH);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+      }
+
+      ctx.fillStyle = mutedColor;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.color === 'bull' ? '▲' : '▼', x, 310);
+    });
+
+    if (!showFootprint) {
+      ctx.fillStyle = mutedColor;
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('zoom in to reveal footprint →', W/2, 295);
+    }
+
+  } else {
+    const candleW = zoomLevel < 1.5 ? 20 : zoomLevel < 2.2 ? 28 : 36;
+    const panelW = zoomLevel < 1.5 ? 0 : zoomLevel < 2.2 ? 80 : 120;
+    const totalW = candleW + panelW + (zoomLevel < 1.5 ? 10 : 20);
+    const spacing = totalW + 16;
+    const startX = (W - numCandles * spacing) / 2;
+    const showPanel = zoomLevel > 1.3;
+    const showNumbers = zoomLevel > 1.8;
+
+    candles.forEach((c, i) => {
+      const x = startX + i * spacing + candleW / 2;
+      const yOpen = priceToY(c.open);
+      const yClose = priceToY(c.close);
+      const yHigh = priceToY(c.high);
+      const yLow = priceToY(c.low);
+      const color = c.color === 'bull' ? bullColor : bearColor;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyBot = Math.max(yOpen, yClose);
+      const bodyH = Math.max(bodyBot - bodyTop, 4);
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, yHigh); ctx.lineTo(x, yLow); ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+
+      if (showPanel) {
+        const panelX = x + candleW/2 + 4;
+        const fp = c.footprint;
+        const pRange = priceMax - priceMin;
+        const rowH = zoomLevel < 2.2 ? 24 : 36;
+
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)';
+        ctx.strokeStyle = bgLine;
+        ctx.lineWidth = 0.5;
+        const totalPanelH = fp.length * rowH;
+        const panelY = bodyTop - (totalPanelH - bodyH) / 2;
+        ctx.fillRect(panelX, panelY, panelW, totalPanelH);
+        ctx.strokeRect(panelX, panelY, panelW, totalPanelH);
+
+        fp.forEach((row, ri) => {
+          const ry = panelY + ri * rowH;
+          const maxVol = 210;
+          const bidBarW = (row.bid / maxVol) * (panelW * 0.42);
+          const askBarW = (row.ask / maxVol) * (panelW * 0.42);
+          const midX = panelX + panelW / 2;
+
+          ctx.fillStyle = bidColor + 'bb';
+          ctx.fillRect(midX - bidBarW - 1, ry + 3, bidBarW, rowH - 6);
+          ctx.fillStyle = askColor + 'bb';
+          ctx.fillRect(midX + 1, ry + 3, askBarW, rowH - 6);
+
+          if (showNumbers) {
+            ctx.fillStyle = textColor;
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(row.bid, midX - 2, ry + rowH * 0.65);
+            ctx.textAlign = 'left';
+            ctx.fillText(row.ask, midX + 2, ry + rowH * 0.65);
+          }
+
+          ctx.strokeStyle = bgLine;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(panelX, ry); ctx.lineTo(panelX + panelW, ry); ctx.stroke();
+
+          if (showNumbers) {
+            ctx.fillStyle = mutedColor;
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(row.price.toLocaleString(), panelX - 3, ry + rowH * 0.65);
+          }
+        });
+
+        ctx.strokeStyle = isDark ? '#444' : '#ccc';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([2,3]);
+        ctx.beginPath();
+        ctx.moveTo(x + candleW/2, (bodyTop + bodyBot)/2);
+        ctx.lineTo(panelX, panelY + totalPanelH/2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.fillStyle = mutedColor;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.color === 'bull' ? '▲' : '▼', x, 310);
+    });
+
+    if (!showPanel) {
+      ctx.fillStyle = mutedColor;
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('zoom in to reveal footprint panels →', W/2, 295);
+    }
+  }
+
+  ctx.fillStyle = mutedColor;
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'left';
+  const labels = ['42,800','42,600','42,400','42,200','42,000'];
+  [42800,42600,42400,42200,42000].forEach((p,i) => {
+    const y = priceToY(p);
+    ctx.beginPath(); ctx.strokeStyle = bgLine; ctx.lineWidth = 0.5;
+    ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillText(labels[i], 2, y - 2);
+  });
+}
+
+window.addEventListener('load', draw);
+window.addEventListener('resize', draw);
+</script>
