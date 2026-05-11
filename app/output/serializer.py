@@ -32,10 +32,11 @@ def serialize_state(
     stats = state.get_stats(window)
     all_candles = state.get_display_state(window_minutes=window)
     
-    # Truncate to num_rows — always include the most recent candles
-    # This is critical: without truncation, high-volume periods
-    # produce 10-50x larger payloads, degrading frontend performance
-    candles = all_candles[-num_rows:] if len(all_candles) > num_rows else all_candles
+    # Truncate to a reasonable limit for the chart history
+    # We increase this from num_rows (which was tied to terminal height) to 100
+    # to allow the Lightweight Chart to show more history while preventing payload bloat.
+    limit = 100
+    candles = all_candles[-limit:] if len(all_candles) > limit else all_candles
 
     serialized_candles = []
     for c in candles:
