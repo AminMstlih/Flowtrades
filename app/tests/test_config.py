@@ -14,8 +14,8 @@ class TestConfigDefaults:
         assert config.aggregation.bucket_size_usd == 1.0
         assert config.aggregation.default_window == 5
         assert config.aggregation.time_windows_minutes == [1, 5, 15]
-        assert config.detection.imbalance_threshold_pct == 70
-        assert config.detection.min_volume_per_bucket_btc == 0.5
+        assert config.detection.imbalance_threshold_pct == 85
+        assert config.detection.min_volume_per_bucket_btc == 0.1
         assert config.display.rows == 20
         assert config.display.refresh_rate_ms == 500
         assert config.exchanges.enabled == ["binance"]

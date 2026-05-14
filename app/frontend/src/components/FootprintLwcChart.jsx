@@ -11,6 +11,52 @@ function defaultOptions() {
   };
 }
 
+/**
+ * Binary search helpers for sorted-descending bucket arrays.
+ * aggBuckets is sorted high→low by price (done once in aggregateCandles).
+ *
+ * Returns the slice [startIdx, endIdx) of buckets whose price falls within
+ * [minPrice, maxPrice] (inclusive). O(log n) per call instead of O(n).
+ */
+function findVisibleBucketRange(buckets, minPrice, maxPrice) {
+  const n = buckets.length;
+  if (n === 0) return [0, 0];
+
+  // Array is descending: buckets[0].price is highest, buckets[n-1].price is lowest.
+  // Find first index where price <= maxPrice (start of visible range).
+  let lo = 0, hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (buckets[mid].price > maxPrice) lo = mid + 1;
+    else hi = mid;
+  }
+  const startIdx = lo;
+
+  // Find first index where price < minPrice (end of visible range).
+  lo = startIdx; hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (buckets[mid].price >= minPrice) lo = mid + 1;
+    else hi = mid;
+  }
+  const endIdx = lo;
+
+  return [startIdx, endIdx];
+}
+
+/**
+ * Measure the pixel row height from the first two adjacent buckets.
+ * Buckets are pre-sorted descending, so index 0 and 1 are adjacent price levels.
+ * Returns a fallback of 16px if fewer than 2 buckets or coordinates unavailable.
+ */
+function measureRowHeight(buckets, priceToCoordinate) {
+  if (buckets.length < 2) return 16;
+  const y0 = priceToCoordinate(buckets[0].price);
+  const y1 = priceToCoordinate(buckets[1].price);
+  if (y0 === null || y1 === null) return 16;
+  return Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+}
+
 function makeFootprintPaneView() {
   const state = {
     bars: [],
@@ -40,6 +86,30 @@ function makeFootprintPaneView() {
 
         const px = scope.horizontalPixelRatio || 1;
         const py = scope.verticalPixelRatio || 1;
+
+        // Derive the viewport's visible price range once per draw call.
+        // Strategy: probe the price at canvas y=0 (top) and y=height (bottom) by
+        // scanning bar prices until we find the extremes that map to valid coordinates.
+        // This gives us true viewport bounds — not candle OHLC bounds — for culling.
+        // priceToCoordinate returning null means off-screen; we use that as the guard.
+        let viewportMinPrice = Infinity;
+        let viewportMaxPrice = -Infinity;
+        for (const item of bars) {
+          const d = item.originalData;
+          if (!d) continue;
+          const h = Number(d.high), l = Number(d.low);
+          if (Number.isFinite(h) && priceToCoordinate(h) !== null) {
+            if (h > viewportMaxPrice) viewportMaxPrice = h;
+            if (h < viewportMinPrice) viewportMinPrice = h;
+          }
+          if (Number.isFinite(l) && priceToCoordinate(l) !== null) {
+            if (l > viewportMaxPrice) viewportMaxPrice = l;
+            if (l < viewportMinPrice) viewportMinPrice = l;
+          }
+        }
+        // If no bars are on screen at all, fall back to unbounded (no culling).
+        if (!Number.isFinite(viewportMinPrice)) viewportMinPrice = -Infinity;
+        if (!Number.isFinite(viewportMaxPrice)) viewportMaxPrice = Infinity;
 
         for (const item of bars) {
           const x = item.x;
@@ -86,20 +156,24 @@ function makeFootprintPaneView() {
             if (buckets.length > 0) {
               const maxVol = Math.max(options.maxVolumeGlobal || 1, 1);
 
-              // Measure actual vertical row height from price coordinates
-              const sortedPrices = buckets.map(b => Number(b.price)).filter(p => Number.isFinite(p)).sort((a, b) => b - a);
-              let rowH = 16; // fallback
-              if (sortedPrices.length >= 2) {
-                const y0 = priceToCoordinate(sortedPrices[0]);
-                const y1 = priceToCoordinate(sortedPrices[1]);
-                if (y0 !== null && y1 !== null) {
-                  rowH = Math.max(6, Math.min(32, Math.abs(y1 - y0)));
-                }
-              }
+              // Buckets are pre-sorted descending by price from aggregateCandles.
+              // measureRowHeight uses the first two adjacent buckets — no sort needed.
+              const rowH = measureRowHeight(buckets, priceToCoordinate);
               const barHeight = Math.max(2, rowH * 0.55);
 
-              for (const b of buckets) {
-                const price = Number(b.price);
+              // Cull to viewport price range (not candle OHLC range).
+              // This correctly handles: long wicks, cross-exchange buckets outside OHLC,
+              // and zoomed-in views where only part of a candle's range is visible.
+              const rowHMargin = rowH; // one row of margin to avoid edge clipping
+              const [startIdx, endIdx] = findVisibleBucketRange(
+                buckets,
+                viewportMinPrice - rowHMargin,
+                viewportMaxPrice + rowHMargin,
+              );
+
+              for (let bi = startIdx; bi < endIdx; bi++) {
+                const b = buckets[bi];
+                const price = b.price;
                 const y = priceToCoordinate(price);
                 if (y === null) continue;
 
@@ -143,17 +217,8 @@ function makeFootprintPaneView() {
           // 4. Footprint Overlay (Numeric detail)
           if (showFootprint && showNumbers) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
-            // Measure rowH the same way as section 2
-            const sortedPrices = buckets.map(b => Number(b.price)).filter(p => Number.isFinite(p)).sort((a, b) => b - a);
-            let rowH = 16;
-            if (sortedPrices.length >= 2) {
-              const y0 = priceToCoordinate(sortedPrices[0]);
-              const y1 = priceToCoordinate(sortedPrices[1]);
-              if (y0 !== null && y1 !== null) {
-                rowH = Math.max(6, Math.min(32, Math.abs(y1 - y0)));
-              }
-            }
-
+            // Buckets are pre-sorted descending — reuse measureRowHeight, no re-sort.
+            const rowH = measureRowHeight(buckets, priceToCoordinate);
 
             // Protect horizontal boundaries: ensure text doesn't bleed into adjacent candles
             ctx.save();
@@ -161,8 +226,13 @@ function makeFootprintPaneView() {
             ctx.rect(centerX - laneWidth / 2, 0, laneWidth, scope.bitmapSize.height);
             ctx.clip();
 
-            for (const b of buckets) {
-              const price = Number(b.price);
+            const visMinPrice4 = viewportMinPrice - rowH;
+            const visMaxPrice4 = viewportMaxPrice + rowH;
+            const [startIdx, endIdx] = findVisibleBucketRange(buckets, visMinPrice4, visMaxPrice4);
+
+            for (let bi = startIdx; bi < endIdx; bi++) {
+              const b = buckets[bi];
+              const price = b.price;
               const y = priceToCoordinate(price);
               if (y === null) continue;
 
@@ -198,10 +268,19 @@ function makeFootprintPaneView() {
           // 5. Badges / Flags (Absorption, Exhaustion, Imbalance)
           if (showFootprint && options.showBadges !== false) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
-            for (const b of buckets) {
+            // Reuse binary search — only iterate buckets in visible price range
+            const rowH = measureRowHeight(buckets, priceToCoordinate);
+            const [startIdx, endIdx] = findVisibleBucketRange(
+              buckets,
+              viewportMinPrice - rowH,
+              viewportMaxPrice + rowH,
+            );
+
+            for (let bi = startIdx; bi < endIdx; bi++) {
+              const b = buckets[bi];
               if (!b.flags || b.flags.length === 0) continue;
               
-              const price = Number(b.price);
+              const price = b.price;
               const y = priceToCoordinate(price);
               if (y === null) continue;
 
@@ -225,7 +304,6 @@ function makeFootprintPaneView() {
                 ctx.font = `600 9px Inter, sans-serif`;
                 const textWidth = ctx.measureText(flag.type).width;
                 const paddingX = 4;
-                const paddingY = 2;
                 const boxWidth = textWidth + paddingX * 2;
                 const boxHeight = 14;
                 
@@ -276,6 +354,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
+  const tooltipRef = useRef(null);
   const hasInitializedRef = useRef(false);
   const isProgrammaticChangeRef = useRef(false);
   const lastFirstCandleTimeRef = useRef(null);
@@ -321,6 +400,22 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
         textColor: '#E0E7EF',
         fontSize: 12,
       },
+      crosshair: {
+        // Normal mode: crosshair follows mouse freely across the full price range.
+        // Default (Magnet) snaps to the nearest data point — wrong for footprint charts
+        // where the user needs to inspect specific price levels, not just OHLC points.
+        mode: 0, // CrosshairMode.Normal
+        vertLine: {
+          width: 1,
+          color: 'rgba(143, 168, 190, 0.4)',
+          style: 2, // dashed
+        },
+        horzLine: {
+          width: 1,
+          color: 'rgba(143, 168, 190, 0.4)',
+          style: 2, // dashed
+        },
+      },
       grid: {
         vertLines: { color: 'rgba(30, 52, 72, 0.9)' },
         horzLines: { color: 'rgba(30, 52, 72, 0.9)' },
@@ -347,6 +442,75 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
 
     chartRef.current = chart;
     seriesRef.current = series;
+
+    // Crosshair tooltip — shows OHLC + delta on hover
+    chart.subscribeCrosshairMove((param) => {
+      const tooltip = tooltipRef.current;
+      if (!tooltip) return;
+
+      if (
+        !param.point ||
+        param.point.x < 0 ||
+        param.point.y < 0 ||
+        !param.time
+      ) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const data = param.seriesData.get(series);
+      if (!data) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const open  = Number(data.open).toFixed(1);
+      const high  = Number(data.high).toFixed(1);
+      const low   = Number(data.low).toFixed(1);
+      const close = Number(data.close).toFixed(1);
+
+      // delta = sum of all bucket deltas
+      const buckets = data.aggBuckets || [];
+      const delta = buckets.reduce((sum, b) => sum + (Number(b.delta) || 0), 0);
+      const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+      const deltaColor = delta >= 0 ? '#26A69A' : '#EF5350';
+
+      // Format timestamp
+      const ts = new Date(param.time * 1000);
+      const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const dateStr = ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+      tooltip.innerHTML = `
+        <div class="ct-time">${dateStr} ${timeStr}</div>
+        <div class="ct-row"><span class="ct-label">O</span><span class="ct-val">${open}</span></div>
+        <div class="ct-row"><span class="ct-label">H</span><span class="ct-val">${high}</span></div>
+        <div class="ct-row"><span class="ct-label">L</span><span class="ct-val">${low}</span></div>
+        <div class="ct-row"><span class="ct-label">C</span><span class="ct-val">${close}</span></div>
+        <div class="ct-row"><span class="ct-label">Δ</span><span class="ct-val" style="color:${deltaColor}">${deltaStr}</span></div>
+      `;
+
+      // Position tooltip — keep it inside the container
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const tooltipW = 110;
+      const tooltipH = 110;
+      const margin = 12;
+
+      let left = param.point.x + margin;
+      let top  = param.point.y - tooltipH / 2;
+
+      // Flip horizontally if too close to right edge
+      if (left + tooltipW > rect.width) {
+        left = param.point.x - tooltipW - margin;
+      }
+      // Clamp vertically
+      top = Math.max(margin, Math.min(top, rect.height - tooltipH - margin));
+
+      tooltip.style.left    = `${left}px`;
+      tooltip.style.top     = `${top}px`;
+      tooltip.style.display = 'block';
+    });
 
     // Detect user interaction
     chart.timeScale().subscribeVisibleTimeRangeChange(() => {
@@ -466,6 +630,8 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
         height: height ? `${height}px` : '100%',
         position: 'relative',
       }}
-    />
+    >
+      <div ref={tooltipRef} className="crosshair-tooltip" style={{ display: 'none' }} />
+    </div>
   );
 }

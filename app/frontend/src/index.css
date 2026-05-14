@@ -1162,3 +1162,49 @@ body {
     font-size: 0.85rem;
   }
 }
+
+/* ── CROSSHAIR TOOLTIP ───────────────────────────────── */
+
+.crosshair-tooltip {
+  position: absolute;
+  z-index: 200;
+  pointer-events: none;
+  background: rgba(13, 27, 42, 0.92);
+  border: 1px solid rgba(143, 168, 190, 0.2);
+  border-radius: 5px;
+  padding: 7px 10px;
+  min-width: 100px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.ct-time {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+
+.ct-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 1.6;
+}
+
+.ct-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ct-val {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+}

@@ -62,9 +62,14 @@ export function aggregateCandles(candles, tickSize) {
 
     pocs[i] = pocPrice;
 
+    // Pre-sort buckets descending by price once here, at aggregation time.
+    // The renderer can then use binary search instead of sorting on every draw frame.
+    const sortedBuckets = Array.from(aggregatedBuckets.values())
+      .sort((a, b) => b.price - a.price);
+
     newlyAggregatedCandles.push({
       ...c,
-      aggBuckets: Array.from(aggregatedBuckets.values())
+      aggBuckets: sortedBuckets
     });
   });
 

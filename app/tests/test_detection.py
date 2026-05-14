@@ -25,16 +25,27 @@ def make_candle_with_buckets(buckets_data: list[dict]) -> FootprintCandle:
         end_time_ms=1060000,
     )
     
+    total_buy = 0.0
+    total_sell = 0.0
+
     for bd in buckets_data:
         price = bd["price"]
         bucket = PriceBucket(price=price)
-        if "buy_vol" in bd and bd["buy_vol"] > 0:
-            bucket.add_buy(bd["buy_vol"])
-        if "sell_vol" in bd and bd["sell_vol"] > 0:
-            bucket.add_sell(bd["sell_vol"])
+        buy = bd.get("buy_vol", 0.0)
+        sell = bd.get("sell_vol", 0.0)
+        if buy > 0:
+            bucket.add_buy(buy)
+        if sell > 0:
+            bucket.add_sell(sell)
         candle.buckets[price] = bucket
-    
-    # Set OHLC from bucket prices
+        total_buy += buy
+        total_sell += sell
+
+    # Set candle-level OHLCV so candle.total_vol is correct.
+    # detect() guards on candle_total_vol <= 0 — without this, all flags are silently dropped.
+    candle.buy_vol = total_buy
+    candle.sell_vol = total_sell
+
     prices = [bd["price"] for bd in buckets_data]
     candle.open = prices[0]
     candle.high = max(prices)
@@ -148,12 +159,19 @@ class TestAbsorptionDetection:
         )
         
         # Add buckets with varying volumes
+        total_buy = 0.0
+        total_sell = 0.0
         for i, vol in enumerate([5.0, 10.0, 50.0, 5.0, 3.0]):
             price = 67248.0 + i
             bucket = PriceBucket(price=price)
             bucket.add_buy(vol / 2)
             bucket.add_sell(vol / 2)
             candle.buckets[price] = bucket
+            total_buy += vol / 2
+            total_sell += vol / 2
+        # Set candle-level volumes so detect() doesn't short-circuit on total_vol == 0
+        candle.buy_vol = total_buy
+        candle.sell_vol = total_sell
         
         engine = DetectionEngine(
             absorption_vol_percentile=75.0,
@@ -197,68 +215,144 @@ class TestAbsorptionDetection:
 # ── Exhaustion Detection Tests ────────────────────────────────────
 
 class TestExhaustionDetection:
-    """Tests for exhaustion detection — Section 4.3 of architecture doc."""
+    """Tests for exhaustion detection — Option C: midpoint snapshot comparison."""
 
-    def test_balanced_fight_flagged(self):
-        """Bucket with 55/45 buy/sell split → exhaustion flagged."""
-        candle = make_candle_with_buckets([
-            {"price": 67248.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67249.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67250.0, "buy_vol": 55.0, "sell_vol": 45.0},
-            {"price": 67251.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67252.0, "buy_vol": 1.0, "sell_vol": 1.0},
-        ])
-        
-        engine = DetectionEngine(
-            exhaustion_spike_percentile=80.0,
-            exhaustion_counter_pct=40.0,
-            min_volume_per_bucket_btc=0.5,
-        )
-        flags = engine.detect(candle)
-        
-        exhaustion_flags = [f for f in flags[67250.0] if f.type == DetectionType.EXHAUSTION]
-        assert len(exhaustion_flags) == 1
-        assert exhaustion_flags[0].direction == "buy"
+    def _make_candle_with_midpoint(
+        self,
+        early_trades: list[dict],
+        late_trades: list[dict],
+        start_ms: int = 1_000_000,
+        interval_ms: int = 300_000,
+    ) -> FootprintCandle:
+        """
+        Build a candle by feeding trades through FootprintChart so the midpoint
+        snapshot is captured correctly via add_trade's ts_ms path.
+        """
+        from aggregation.engine import FootprintChart
+        chart = FootprintChart(bucket_size=1.0, interval_seconds=interval_ms // 1000)
 
-    def test_one_sided_not_exhaustion(self):
-        """95/5 buy/sell split → not exhaustion, it's imbalance."""
-        candle = make_candle_with_buckets([
-            {"price": 67248.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67249.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67250.0, "buy_vol": 95.0, "sell_vol": 5.0},
-            {"price": 67251.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67252.0, "buy_vol": 1.0, "sell_vol": 1.0},
-        ])
-        
-        engine = DetectionEngine(
-            exhaustion_spike_percentile=80.0,
-            exhaustion_counter_pct=40.0,
-            min_volume_per_bucket_btc=0.5,
-        )
-        flags = engine.detect(candle)
-        
-        exhaustion_flags = [f for f in flags[67250.0] if f.type == DetectionType.EXHAUSTION]
-        assert len(exhaustion_flags) == 0
+        midpoint_ms = start_ms + interval_ms // 2
 
-    def test_low_counter_pressure_not_exhaustion(self):
-        """70/30 buy/sell split → counter-pressure below 40% threshold."""
-        candle = make_candle_with_buckets([
-            {"price": 67248.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67249.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67250.0, "buy_vol": 70.0, "sell_vol": 30.0},
-            {"price": 67251.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67252.0, "buy_vol": 1.0, "sell_vol": 1.0},
-        ])
-        
-        engine = DetectionEngine(
-            exhaustion_spike_percentile=80.0,
-            exhaustion_counter_pct=40.0,
-            min_volume_per_bucket_btc=0.5,
+        # Early trades: before midpoint
+        for t in early_trades:
+            chart.add_trade(
+                ts_ms=start_ms + t.get("offset_ms", 0),
+                price=t["price"],
+                volume=t["volume"],
+                side=t["side"],
+                exchange="okx",
+            )
+
+        # Late trades: after midpoint
+        for t in late_trades:
+            chart.add_trade(
+                ts_ms=midpoint_ms + t.get("offset_ms", 1000),
+                price=t["price"],
+                volume=t["volume"],
+                side=t["side"],
+                exchange="okx",
+            )
+
+        candles = chart.get_snapshot()
+        assert len(candles) == 1, f"Expected 1 candle, got {len(candles)}"
+        return candles[0]
+
+    def test_buy_exhaustion_detected(self):
+        """
+        Strong buy push in early half, strong sell counter-pressure in late half
+        at the same price level → exhaustion flagged on buy side.
+        """
+        candle = self._make_candle_with_midpoint(
+            early_trades=[
+                {"price": 67250.0, "volume": 40.0, "side": "buy", "offset_ms": 10_000},
+                {"price": 67250.0, "volume": 5.0,  "side": "sell", "offset_ms": 20_000},
+                # filler buckets so candle_total_vol is meaningful
+                {"price": 67249.0, "volume": 2.0, "side": "buy", "offset_ms": 30_000},
+                {"price": 67251.0, "volume": 2.0, "side": "sell", "offset_ms": 40_000},
+            ],
+            late_trades=[
+                {"price": 67250.0, "volume": 35.0, "side": "sell", "offset_ms": 10_000},
+                {"price": 67249.0, "volume": 1.0, "side": "buy", "offset_ms": 20_000},
+            ],
         )
+
+        engine = DetectionEngine()
         flags = engine.detect(candle)
-        
-        exhaustion_flags = [f for f in flags[67250.0] if f.type == DetectionType.EXHAUSTION]
-        assert len(exhaustion_flags) == 0
+
+        exh_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.EXHAUSTION]
+        assert len(exh_flags) == 1
+        assert exh_flags[0].direction == "buy"
+
+    def test_sell_exhaustion_detected(self):
+        """
+        Strong sell push in early half, strong buy counter-pressure in late half → sell exhaustion.
+        """
+        candle = self._make_candle_with_midpoint(
+            early_trades=[
+                {"price": 67250.0, "volume": 5.0,  "side": "buy",  "offset_ms": 10_000},
+                {"price": 67250.0, "volume": 40.0, "side": "sell", "offset_ms": 20_000},
+                {"price": 67249.0, "volume": 2.0, "side": "buy",  "offset_ms": 30_000},
+                {"price": 67251.0, "volume": 2.0, "side": "sell", "offset_ms": 40_000},
+            ],
+            late_trades=[
+                {"price": 67250.0, "volume": 35.0, "side": "buy",  "offset_ms": 10_000},
+                {"price": 67249.0, "volume": 1.0, "side": "sell", "offset_ms": 20_000},
+            ],
+        )
+
+        engine = DetectionEngine()
+        flags = engine.detect(candle)
+
+        exh_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.EXHAUSTION]
+        assert len(exh_flags) == 1
+        assert exh_flags[0].direction == "sell"
+
+    def test_same_direction_both_halves_not_exhaustion(self):
+        """
+        Buy dominant in both early and late half → not exhaustion, just sustained buying.
+        """
+        candle = self._make_candle_with_midpoint(
+            early_trades=[
+                {"price": 67250.0, "volume": 40.0, "side": "buy",  "offset_ms": 10_000},
+                {"price": 67250.0, "volume": 5.0,  "side": "sell", "offset_ms": 20_000},
+                {"price": 67249.0, "volume": 2.0, "side": "buy",  "offset_ms": 30_000},
+            ],
+            late_trades=[
+                {"price": 67250.0, "volume": 30.0, "side": "buy",  "offset_ms": 10_000},
+                {"price": 67250.0, "volume": 3.0,  "side": "sell", "offset_ms": 20_000},
+            ],
+        )
+
+        engine = DetectionEngine()
+        flags = engine.detect(candle)
+
+        exh_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.EXHAUSTION]
+        assert len(exh_flags) == 0
+
+    def test_no_midpoint_snapshot_no_crash_no_false_positive(self):
+        """
+        Candle where all trades arrived before the midpoint — midpoint_snapshot is None.
+        Detection must return gracefully with no exhaustion flags and no exception.
+        """
+        # Build candle manually with all trades before midpoint
+        candle = FootprintCandle(
+            start_time_ms=1_000_000,
+            end_time_ms=1_300_000,  # 5-minute candle
+        )
+        # Add trades only in the early half (before midpoint at 1_150_000)
+        candle.add_trade(67250.0, 40.0, "buy",  bucket_size=1.0, ts_ms=1_010_000)
+        candle.add_trade(67250.0, 5.0,  "sell", bucket_size=1.0, ts_ms=1_020_000)
+        candle.add_trade(67249.0, 2.0,  "buy",  bucket_size=1.0, ts_ms=1_030_000)
+
+        assert candle.midpoint_snapshot is None, "Snapshot should not exist — all trades before midpoint"
+
+        engine = DetectionEngine()
+        # Must not raise, must not produce exhaustion flags
+        flags = engine.detect(candle)
+
+        for price_flags in flags.values():
+            exh = [f for f in price_flags if f.type == DetectionType.EXHAUSTION]
+            assert len(exh) == 0, f"False positive exhaustion at price with no midpoint snapshot"
 
 
 # ── Multiple Detections Tests ─────────────────────────────────────
@@ -268,27 +362,30 @@ class TestMultipleDetections:
 
     def test_imbalance_and_exhaustion_mutual_exclusion(self):
         """
-        A bucket can't have both imbalance (one-sided) and exhaustion (two-sided).
-        If imbalance is detected, exhaustion should not fire for the same bucket.
+        A bucket with strong one-sided imbalance in both halves should get
+        imbalance flagged but NOT exhaustion (no direction flip).
+        Uses the real trade-based candle builder so midpoint_snapshot is populated.
         """
-        candle = make_candle_with_buckets([
-            {"price": 67248.0, "buy_vol": 1.0, "sell_vol": 1.0},
-            {"price": 67250.0, "buy_vol": 90.0, "sell_vol": 10.0},
-            {"price": 67252.0, "buy_vol": 1.0, "sell_vol": 1.0},
-        ])
-        
-        engine = DetectionEngine(
-            imbalance_threshold_pct=70.0,
-            exhaustion_spike_percentile=70.0,
-            exhaustion_counter_pct=40.0,
-            min_volume_per_bucket_btc=0.5,
-        )
+        from aggregation.engine import FootprintChart
+        chart = FootprintChart(bucket_size=1.0, interval_seconds=300)
+        start_ms = 1_000_000
+        mid_ms = start_ms + 150_000
+
+        # Early half: strong buy at 67250
+        chart.add_trade(ts_ms=start_ms + 10_000, price=67250.0, volume=45.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 20_000, price=67250.0, volume=5.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 30_000, price=67248.0, volume=2.0,  side="buy",  exchange="okx")
+        # Late half: still buy dominant (no flip)
+        chart.add_trade(ts_ms=mid_ms + 10_000, price=67250.0, volume=35.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 20_000, price=67250.0, volume=4.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 30_000, price=67248.0, volume=1.0,  side="buy",  exchange="okx")
+
+        candle = chart.get_snapshot()[0]
+
+        engine = DetectionEngine(imbalance_threshold_pct=70.0)
         flags = engine.detect(candle)
-        
-        bucket_flags = flags[67250.0]
-        flag_types = {f.type for f in bucket_flags}
-        
-        # Should have imbalance but NOT exhaustion (90% buy > 90% threshold)
+
+        flag_types = {f.type for f in flags.get(67250.0, [])}
         assert DetectionType.IMBALANCE in flag_types
         assert DetectionType.EXHAUSTION not in flag_types
 
