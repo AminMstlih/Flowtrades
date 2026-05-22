@@ -76,7 +76,8 @@ class FootprintState:
                 ts_ms=now_ms,
                 price=trade.price,
                 volume=trade.volume,
-                side=trade.side
+                side=trade.side,
+                exchange=trade.exchange
             )
 
         # Bookkeeping

@@ -63,9 +63,15 @@ export function useFootprintViewModel({
 
     if (uniqueBins.size === 0) return { prices: [], minBin: 0, maxBin: -1 };
 
-    const paddingBins = 200;
-    const maxBin = Math.max(...Array.from(uniqueBins)) + paddingBins;
-    const minBin = Math.min(...Array.from(uniqueBins)) - paddingBins;
+    const rawMax = Math.max(...Array.from(uniqueBins));
+    const rawMin = Math.min(...Array.from(uniqueBins));
+    const dataRangeBins = Math.max(rawMax - rawMin, 1);
+
+    // Padding is proportional to the actual data range, not a hardcoded 200.
+    // 15% on each side, capped at 30 bins so the ladder never grows absurdly large.
+    const paddingBins = Math.min(30, Math.ceil(dataRangeBins * 0.15));
+    const maxBin = rawMax + paddingBins;
+    const minBin = rawMin - paddingBins;
 
     const binsCount = maxBin - minBin + 1;
     if (binsCount <= 0 || binsCount > 10000) return { prices: [], minBin: 0, maxBin: -1 };

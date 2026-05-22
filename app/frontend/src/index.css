@@ -755,64 +755,81 @@ body {
 /* Mobile (max-width: 768px) */
 @media (max-width: 768px) {
   .header {
-    flex-direction: column;
-    height: auto;
-    padding: 8px 12px;
-    gap: 8px;
+    flex-direction: row !important;
+    height: 44px !important;
+    padding: 0 8px !important;
+    gap: 4px !important;
+    justify-content: space-between !important;
   }
 
   .header-left {
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-start;
+    flex-direction: row !important;
+    gap: 4px !important;
+    flex: 0 1 auto !important;
+  }
+
+  .title {
+    display: none !important;
+  }
+
+  .exchange-list {
+    font-size: 0.6rem !important;
+    white-space: nowrap;
   }
 
   .header-center {
-    order: -1;
+    flex: 1 !important;
+    justify-content: center !important;
+    order: 0 !important;
   }
 
   .live-price {
-    font-size: 1.2rem;
+    font-size: 1.1rem !important;
+    margin: 0 !important;
   }
 
   .header-right {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
+    flex: 0 1 auto !important;
+    align-items: flex-end !important;
+    flex-direction: column !important;
   }
 
   .controls-row {
-    gap: 8px;
+    gap: 4px !important;
+  }
+
+  .control-group label {
+    display: none !important;
+  }
+
+  .control-group select {
+    padding: 2px 4px !important;
+    font-size: 0.65rem !important;
+    min-height: 28px !important;
+    min-width: 32px !important;
   }
 
   .stats-row {
-    gap: 8px;
-    font-size: 0.6rem;
+    display: none !important;
   }
 
   .main-viewport-wrapper {
-    flex-direction: column;
-    padding-bottom: 120px;
-    /* Increased to accommodate price scale */
+    flex-direction: row !important;
+    padding-bottom: 80px !important;
   }
 
   .chart-area {
-    flex: 1;
-    min-height: 0;
+    flex: 1 !important;
+    min-height: 0 !important;
   }
 
   .price-axis-sidebar {
-    width: 100%;
-    height: 40px;
-    position: fixed;
-    bottom: 120px;
-    /* Positioned above delta pane */
-    left: 0;
-    right: 0;
-    z-index: 30;
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background-color: var(--bg-panel);
+    width: 60px !important;
+    height: 100% !important;
+    position: relative !important;
+    bottom: auto !important;
+    z-index: 30 !important;
+    border-left: 1px solid var(--border-subtle) !important;
   }
 
   .price-scale-sidebar {
@@ -821,13 +838,11 @@ body {
   }
 
   .price-scale-container {
-    display: flex;
-    flex-direction: row;
-    width: max-content;
-    top: 0;
-    height: 100%;
-    transform: translateX(0);
-    /* Reset Y transform for horizontal layout */
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    width: 100% !important;
+    will-change: transform;
   }
 
   .price-tick {
@@ -855,8 +870,8 @@ body {
   }
 
   .fixed-bottom-panels {
-    right: 0;
-    height: 76px;
+    right: 60px !important;
+    height: 80px !important;
   }
 
   .delta-pane-bar-container {
@@ -1146,4 +1161,50 @@ body {
   .price-tick {
     font-size: 0.85rem;
   }
+}
+
+/* ── CROSSHAIR TOOLTIP ───────────────────────────────── */
+
+.crosshair-tooltip {
+  position: absolute;
+  z-index: 200;
+  pointer-events: none;
+  background: rgba(13, 27, 42, 0.92);
+  border: 1px solid rgba(143, 168, 190, 0.2);
+  border-radius: 5px;
+  padding: 7px 10px;
+  min-width: 100px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.ct-time {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+
+.ct-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 1.6;
+}
+
+.ct-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ct-val {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
 }

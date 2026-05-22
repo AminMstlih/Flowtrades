@@ -37,10 +37,10 @@ Exchange APIs → Normalization → Trade Bus → Aggregation → FastAPI Server
                                                     ↕
                                               WebSocket Broadcast
 ```
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/48de52bd-41ac-45de-8198-2c8006c16ef4" />
-<img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/4accfa67-04a7-424e-928d-9574127f7a88" />
-<img width="1676" height="768" alt="image" src="https://github.com/user-attachments/assets/e1bbe359-7be9-45cc-9012-84626569c08a" />
-<img width="768" height="1676" alt="image" src="https://github.com/user-attachments/assets/4ed187f8-92c2-4141-9e00-1bc6df3e57b6" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/38388502-b8c2-4d85-b1ce-48de5d92f859" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/a71ad8bf-3ac0-45ae-8692-8332bbc59f9f" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/cc362b3d-ce42-483b-9c17-e2b36942de1a" />
+
 
 
 
@@ -158,6 +158,8 @@ Access: http://localhost:8000
 
 ### Exchange Configuration
 By default, the application is pre-configured to use **OKX** as the primary data source. This is recommended for users in regions (like Indonesia) where Binance IP restrictions (`HTTP 403`) are common.
+
+> ⚓ **Architecture Note (OHLC Anchoring):** While the footprint ladder aggregates trading volume from ALL enabled exchanges to show full market liquidity, the Candlestick bounds (Open, High, Low, Close) are strictly anchored to the primary exchange (OKX). This prevents cross-exchange price differences (e.g. BTC-USDT-SWAP vs BTCUSDT) from creating visual artifacts or gaps in the candle bodies.
 
 To edit your exchange sources:
 1. Open `config.toml` in the root directory.

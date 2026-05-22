@@ -68,7 +68,7 @@ class DetectionEngine:
         self,
         imbalance_threshold_pct: float = 85.0,
         min_bucket_weight_pct: float = 5.0,
-        min_trades_per_bucket: int = 3,
+        min_trades_per_bucket: int = 1,
         absorption_vol_percentile: float = 90.0,
         absorption_price_pct: float = 0.05,
         exhaustion_spike_percentile: float = 90.0,
@@ -165,7 +165,7 @@ class DetectionEngine:
             raw_severity = (abs_imbalance - self.imbalance_threshold_pct) / (100.0 - self.imbalance_threshold_pct) * 8.0 + 2.0
             severity = min(10.0, max(1.0, raw_severity * confidence))
 
-            if severity < 4.0:
+            if severity < 2.0:
                 continue
 
             flags[price].append(DetectionFlag(
@@ -226,7 +226,7 @@ class DetectionEngine:
             vol_ratio = bucket.total_vol / vol_threshold
             severity = min(10.0, max(1.0, vol_ratio * 3.0 * confidence))
 
-            if severity < 4.0:
+            if severity < 2.0:
                 continue
 
             flags[price].append(DetectionFlag(
@@ -250,57 +250,84 @@ class DetectionEngine:
         candle_total_vol: float,
     ) -> None:
         """
-        Exhaustion Detection — Section 4.3.
-        
-        Flags volume spikes with significant counter-pressure.
-        Indicates momentum weakening.
+        Exhaustion Detection — Option C implementation.
+
+        Compares early-window delta vs late-window delta per bucket using the
+        midpoint snapshot captured during trade ingestion.
+
+        Early delta  = buy_at_midpoint - sell_at_midpoint
+        Late delta   = (buy_final - buy_at_midpoint) - (sell_final - sell_at_midpoint)
+
+        Exhaustion fires when:
+        - The bucket had a strong directional push in the early window
+        - The late window shows meaningful counter-pressure (direction flipped or
+          significantly weakened)
+        - The bucket qualifies by volume weight
+
+        Only runs on sealed candles (midpoint_snapshot must exist).
+        If midpoint_snapshot is None, returns silently — no crash, no false positives.
         """
+        if candle.midpoint_snapshot is None:
+            # Candle had no trades after the midpoint — cannot detect exhaustion.
+            return
+
         if not candle.buckets:
             return
 
-        volumes = [b.total_vol for b in candle.buckets.values() if b.total_vol > 0]
-        if len(volumes) < 3:
-            return
-
-        spike_threshold = self._percentile(volumes, self.exhaustion_spike_percentile)
+        snap = candle.midpoint_snapshot
 
         for price, bucket in candle.buckets.items():
             if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
-            if bucket.total_vol < spike_threshold:
+
+            # Get early-window cumulative volumes from snapshot
+            snap_buy, snap_sell = snap.bucket_volumes.get(price, (0.0, 0.0))
+            early_delta = snap_buy - snap_sell
+
+            # Late-window = final minus snapshot
+            late_buy = bucket.buy_vol - snap_buy
+            late_sell = bucket.sell_vol - snap_sell
+            late_delta = late_buy - late_sell
+
+            # Need meaningful volume in both halves
+            early_vol = snap_buy + snap_sell
+            late_vol = late_buy + late_sell
+            if early_vol <= 0 or late_vol <= 0:
                 continue
 
-            buy_pct = (bucket.buy_vol / bucket.total_vol) * 100.0
-            sell_pct = (bucket.sell_vol / bucket.total_vol) * 100.0
-
-            # Must NOT be one-sided (that's imbalance, not exhaustion)
-            if buy_pct > 90 or sell_pct > 90:
+            # Early push must be directionally significant (>60% one-sided)
+            early_imb = abs(early_delta) / early_vol
+            if early_imb < 0.60:
                 continue
 
-            weaker_pct = min(buy_pct, sell_pct)
-            if weaker_pct < self.exhaustion_counter_pct:
+            # Late window must show counter-pressure: delta flipped direction
+            # AND the counter-pressure is at least 40% of the early push magnitude
+            if (early_delta > 0 and late_delta >= 0) or (early_delta < 0 and late_delta <= 0):
+                # No flip — same direction in both halves, not exhaustion
                 continue
 
-            dominant_side = "buy" if buy_pct > sell_pct else "sell"
+            counter_ratio = abs(late_delta) / max(abs(early_delta), 0.001)
+            if counter_ratio < 0.40:
+                continue
+
+            # Direction of the exhausted push (the early dominant side)
+            exhausted_side = "buy" if early_delta > 0 else "sell"
             confidence = self._confidence_factor(bucket, candle_total_vol)
-            
-            closeness = 50.0 - abs(buy_pct - 50.0)
-            vol_factor = min(1.0, bucket.total_vol / (spike_threshold * 2))
-            severity = min(10.0, max(1.0, ((closeness / 10.0) + (vol_factor * 3.0)) * confidence))
+            severity = min(10.0, max(1.0, (early_imb * 5.0 + counter_ratio * 3.0) * confidence))
 
-            if severity < 4.0:
+            if severity < 2.0:
                 continue
 
             flags[price].append(DetectionFlag(
                 type=DetectionType.EXHAUSTION,
-                direction=dominant_side,
+                direction=exhausted_side,
                 severity=round(severity, 1),
-                label=f"Volume spike with counter-pressure — {'buy' if dominant_side == 'sell' else 'sell'} momentum may be weakening",
+                label=f"{'Buy' if exhausted_side == 'buy' else 'Sell'} push in first half reversed by counter-pressure — momentum may be weakening",
                 metadata={
-                    "total_vol": round(bucket.total_vol, 4),
-                    "buy_pct": round(buy_pct, 1),
-                    "sell_pct": round(sell_pct, 1),
-                    "spike_threshold": round(spike_threshold, 4),
+                    "early_delta": round(early_delta, 4),
+                    "late_delta": round(late_delta, 4),
+                    "early_imb_pct": round(early_imb * 100, 1),
+                    "counter_ratio": round(counter_ratio, 2),
                     "confidence": round(confidence, 2),
                 },
             ))

@@ -23,16 +23,21 @@ export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX 
     if (deltas.length === 0) return null;
 
     const cellWidth = barSpacing !== undefined ? barSpacing : Math.max(48, Math.min(132, 105 * Math.max(0.75, scaleX)));
-    const isZoomedOut = cellWidth < 30;
+
+    // Three degradation tiers — never rotate text.
+    // full:    bar + value + time  (>= 60px)
+    // compact: value only          (30–59px)
+    // minimal: value only, tiny    (< 30px)
+    const isFull    = cellWidth >= 60;
+    const isCompact = cellWidth >= 30 && cellWidth < 60;
+    const isMinimal = cellWidth < 30;
 
     return (
         <div className="delta-pane">
             <div className="delta-pane-label">DELTA</div>
             <div
                 className="delta-pane-content"
-                style={{
-                    transform: `translateX(${scrollX}px)`
-                }}
+                style={{ transform: `translateX(${scrollX}px)` }}
             >
                 {deltas.map((d, i) => {
                     const deltaPct = Math.min((Math.abs(d.delta) / maxDelta) * 100, 100);
@@ -41,9 +46,16 @@ export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX 
                     const time = new Date(d.start_time);
                     const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
 
+                    // Font size scales with cell width — never rotates
+                    const fontSize = isFull ? '0.65rem' : isCompact ? '0.6rem' : '0.5rem';
+
                     return (
-                        <div key={i} className="delta-pane-cell" style={{ width: `${cellWidth}px`, justifyContent: isZoomedOut ? 'center' : 'flex-end' }}>
-                            {!isZoomedOut && (
+                        <div
+                            key={i}
+                            className="delta-pane-cell"
+                            style={{ width: `${cellWidth}px`, justifyContent: 'flex-end' }}
+                        >
+                            {isFull && (
                                 <div className="delta-pane-bar-container">
                                     <div
                                         className={`delta-pane-bar ${isBuy ? 'delta-pane-bar-buy' : 'delta-pane-bar-sell'}`}
@@ -51,13 +63,20 @@ export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX 
                                     />
                                 </div>
                             )}
-                            <div 
-                              className={`delta-pane-value ${isBuy ? 'delta-pane-value-buy' : 'delta-pane-value-sell'}`}
-                              style={isZoomedOut ? { fontSize: '0.55rem', transform: 'rotate(-90deg)', whiteSpace: 'nowrap', width: '100%', textAlign: 'center' } : {}}
+                            <div
+                                className={`delta-pane-value ${isBuy ? 'delta-pane-value-buy' : 'delta-pane-value-sell'}`}
+                                style={{
+                                    fontSize,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '100%',
+                                    textAlign: 'center',
+                                }}
                             >
                                 {formatVol(d.delta, true)}
                             </div>
-                            {!isZoomedOut && (
+                            {isFull && (
                                 <div className={`delta-pane-time ${isUp ? 'delta-pane-time-up' : 'delta-pane-time-down'}`}>
                                     {timeStr}
                                 </div>

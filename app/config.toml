@@ -21,7 +21,7 @@ imbalance_threshold_pct = 85
 min_bucket_weight_pct = 10.0
 
 # Minimum trade count per bucket (filters single whale orders)
-min_trades_per_bucket = 3
+min_trades_per_bucket = 1
 
 # Absolute floor — safety net, not primary filter
 min_volume_per_bucket_btc = 0.1
@@ -34,7 +34,7 @@ absorption_price_pct = 0.05
 
 [exchanges]
 # Which exchanges to connect to
-enabled = ["okx"]
+enabled = ["okx", "bybit", "binance"]
 
 [display]
 # Number of price levels to display simultaneously
