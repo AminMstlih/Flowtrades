@@ -4,9 +4,6 @@
 # ──────────────────────────────────────────────────
 
 [aggregation]
-# Price granularity per footprint row (USD)
-bucket_size_usd = 1.0
-
 # Available rolling time windows (minutes)
 time_windows_minutes = [1, 5, 15]
 
@@ -23,9 +20,6 @@ min_bucket_weight_pct = 10.0
 # Minimum trade count per bucket (filters single whale orders)
 min_trades_per_bucket = 1
 
-# Absolute floor — safety net, not primary filter
-min_volume_per_bucket_btc = 0.1
-
 # Volume percentile threshold for absorption flag (top 10% only)
 absorption_vol_percentile = 90
 
@@ -35,6 +29,21 @@ absorption_price_pct = 0.05
 [exchanges]
 # Which exchanges to connect to
 enabled = ["okx", "bybit", "binance"]
+# Which symbols to ingest
+symbols = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+
+[symbols]
+  [symbols."BTC-USDT"]
+  bucket_size = 1.0
+  min_volume = 0.1
+
+  [symbols."ETH-USDT"]
+  bucket_size = 0.1
+  min_volume = 1.0
+
+  [symbols."SOL-USDT"]
+  bucket_size = 0.01
+  min_volume = 10.0
 
 [display]
 # Number of price levels to display simultaneously

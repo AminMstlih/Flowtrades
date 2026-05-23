@@ -2,7 +2,7 @@ import React from 'react';
 import { TICK_STEPS, snapTick } from '../utils/tickSteps';
 import { formatPriceLike } from '../utils/formatVol';
 
-export function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges }) {
+export function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges, symbol, availableSymbols = [], setSymbol }) {
   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
 
   // Map status to display values
@@ -31,6 +31,31 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
 
       <div className="header-right">
         <div className="controls-row">
+          <div className="control-group">
+            <select
+              className="symbol-selector"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              style={{
+                background: '#1e3448',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              {availableSymbols.map((sym) => (
+                <option key={sym} value={sym}>
+                  {sym}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="control-group">
             <label>Tick Size</label>
             <select

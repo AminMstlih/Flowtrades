@@ -19,12 +19,36 @@ const WS_URL_BASE = getWsUrl();
 function App() {
   const {
     tickSize, tickMode, autoFit, timeframeWindow, showBadges, viewportScroll,
-    setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll
+    symbol, availableSymbols,
+    setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll,
+    setSymbol, setAvailableSymbols
   } = useUIStore();
 
   const { status, chartData, connect, disconnect } = useFootprintStore();
 
-  const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
+  const wsUrl = `${WS_URL_BASE}?symbol=${symbol}&window=${timeframeWindow}`;
+
+  useEffect(() => {
+    // Fetch available symbols from backend health endpoint
+    const fetchSymbols = async () => {
+      try {
+        const protocol = window.location.protocol;
+        const host = window.location.host;
+        const apiHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
+        const res = await fetch(`${protocol}//${apiHost}/health`);
+        const data = await res.json();
+        if (data.symbols && data.symbols.length > 0) {
+          setAvailableSymbols(data.symbols);
+          if (!data.symbols.includes(symbol)) {
+            setSymbol(data.symbols[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch symbols", err);
+      }
+    };
+    fetchSymbols();
+  }, [setAvailableSymbols, setSymbol, symbol]);
 
   useEffect(() => {
     connect(wsUrl);
@@ -80,6 +104,9 @@ function App() {
         setTimeframeWindow={setTimeframeWindow}
         showBadges={showBadges}
         setShowBadges={setShowBadges}
+        symbol={symbol}
+        availableSymbols={availableSymbols}
+        setSymbol={setSymbol}
       />
 
       <div className="main-viewport-wrapper">

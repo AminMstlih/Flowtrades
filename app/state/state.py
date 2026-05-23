@@ -29,30 +29,33 @@ class FootprintState:
 
     def __init__(
         self,
-        bucket_size: float = 1.0,
+        symbol: str,
+        bucket_size: float,
+        min_volume: float,
         window_seconds: int = 300,
-        min_volume_btc: float = 0.1,
         imbalance_threshold_pct: float = 85.0,
         min_bucket_weight_pct: float = 5.0,
         min_trades_per_bucket: int = 3,
         absorption_vol_percentile: float = 90.0,
         absorption_price_pct: float = 0.05,
+        max_candles: int = 200,
     ) -> None:
+        self.symbol = symbol
         self.charts = {
-            1: FootprintChart(bucket_size=bucket_size, interval_seconds=60, max_candles=200),
-            5: FootprintChart(bucket_size=bucket_size, interval_seconds=300, max_candles=200),
-            15: FootprintChart(bucket_size=bucket_size, interval_seconds=900, max_candles=200),
-            60: FootprintChart(bucket_size=bucket_size, interval_seconds=3600, max_candles=200),
-            240: FootprintChart(bucket_size=bucket_size, interval_seconds=14400, max_candles=200),
-            1440: FootprintChart(bucket_size=bucket_size, interval_seconds=86400, max_candles=200),
+            1: FootprintChart(bucket_size=bucket_size, interval_seconds=60, max_candles=max_candles),
+            5: FootprintChart(bucket_size=bucket_size, interval_seconds=300, max_candles=max_candles),
+            15: FootprintChart(bucket_size=bucket_size, interval_seconds=900, max_candles=max_candles),
+            60: FootprintChart(bucket_size=bucket_size, interval_seconds=3600, max_candles=max_candles),
+            240: FootprintChart(bucket_size=bucket_size, interval_seconds=14400, max_candles=max_candles),
+            1440: FootprintChart(bucket_size=bucket_size, interval_seconds=86400, max_candles=max_candles),
         }
         self.default_window = 5
-        self.min_volume_btc = min_volume_btc
+        self.min_volume_btc = min_volume
         
         # Detection engine for pattern recognition
         self.detector = DetectionEngine(
             imbalance_threshold_pct=imbalance_threshold_pct,
-            min_volume_per_bucket_btc=min_volume_btc,
+            min_volume_per_bucket_btc=min_volume,
             min_bucket_weight_pct=min_bucket_weight_pct,
             min_trades_per_bucket=min_trades_per_bucket,
             absorption_vol_percentile=absorption_vol_percentile,

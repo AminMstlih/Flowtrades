@@ -20,7 +20,6 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class AggregationConfig(BaseModel):
-    bucket_size_usd: float = Field(default=1.0, gt=0)
     time_windows_minutes: list[int] = Field(default=[1, 5, 15])
     default_window: int = Field(default=5)
 
@@ -48,13 +47,13 @@ class DetectionConfig(BaseModel):
     imbalance_threshold_pct: float = Field(default=85, ge=0, le=100)
     min_bucket_weight_pct: float = Field(default=5.0, ge=0, le=100)
     min_trades_per_bucket: int = Field(default=1, ge=1)
-    min_volume_per_bucket_btc: float = Field(default=0.1, ge=0)
     absorption_vol_percentile: float = Field(default=90, ge=0, le=100)
     absorption_price_pct: float = Field(default=0.05, ge=0)
 
 
 class ExchangesConfig(BaseModel):
     enabled: list[str] = Field(default=["binance"])
+    symbols: list[str] = Field(default=["BTC-USDT"])
 
     @field_validator("enabled")
     @classmethod
@@ -66,6 +65,11 @@ class ExchangesConfig(BaseModel):
         if not v:
             raise ValueError("At least one exchange must be enabled")
         return v
+
+
+class SymbolConfig(BaseModel):
+    bucket_size: float = Field(default=1.0, gt=0)
+    min_volume: float = Field(default=0.1, ge=0)
 
 
 class DisplayConfig(BaseModel):
@@ -102,6 +106,7 @@ class AppConfig(BaseModel):
     aggregation: AggregationConfig = Field(default_factory=AggregationConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     exchanges: ExchangesConfig = Field(default_factory=ExchangesConfig)
+    symbols: dict[str, SymbolConfig] = Field(default_factory=lambda: {"BTC-USDT": SymbolConfig()})
     display: DisplayConfig = Field(default_factory=DisplayConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

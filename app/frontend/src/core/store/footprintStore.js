@@ -25,7 +25,18 @@ export const useFootprintStore = create((set, get) => ({
     if (wsRef?.readyState === WebSocket.OPEN) return;
 
     console.log(`[ws] Connecting to ${url}...`);
-    set({ status: 'connecting' });
+    set({
+      status: 'connecting',
+      chartData: {
+        candles: [],
+        last_price: 0,
+        window_sec: 300,
+        total_trades: 0,
+        total_candles: 0,
+        active_buckets: 0,
+        exchanges: []
+      }
+    });
 
     const ws = new WebSocket(url);
 

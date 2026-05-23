@@ -13,6 +13,7 @@ from __future__ import annotations
 import structlog
 
 from .base import BaseExchangeClient
+from constants.symbols import SYMBOL_MAP
 
 logger = structlog.get_logger(__name__)
 
@@ -41,8 +42,9 @@ class BybitClient(BaseExchangeClient):
 
     WS_URL = "wss://stream.bybit.com/v5/public/linear"
 
-    def __init__(self, log_first_n: int = 100) -> None:
+    def __init__(self, internal_symbols: list[str], log_first_n: int = 100) -> None:
         super().__init__(exchange_name="bybit")
+        self.internal_symbols = internal_symbols
         self._log_first_n = log_first_n
         self._logged_count = 0
 
@@ -51,9 +53,15 @@ class BybitClient(BaseExchangeClient):
         return self.WS_URL
 
     def subscribe_message(self) -> dict | None:
+        args = []
+        for sym in self.internal_symbols:
+            bybit_sym = SYMBOL_MAP.get(sym, {}).get("bybit")
+            if bybit_sym:
+                args.append(f"publicTrade.{bybit_sym}")
+
         return {
             "op": "subscribe",
-            "args": ["publicTrade.BTCUSDT"],
+            "args": args,
         }
 
     def parse_message(self, raw: dict | list) -> list[dict]:
@@ -90,6 +98,12 @@ class BybitClient(BaseExchangeClient):
         if not topic.startswith("publicTrade."):
             return []
 
+        bybit_symbol = topic.replace("publicTrade.", "")
+        internal_symbol = next(
+            (k for k, v in SYMBOL_MAP.items() if v.get("bybit") == bybit_symbol), 
+            bybit_symbol
+        )
+
         data = raw.get("data")
         if not data or not isinstance(data, list):
             return []
@@ -106,7 +120,7 @@ class BybitClient(BaseExchangeClient):
 
             trade_raw = {
                 "exchange": "bybit",
-                "symbol": "BTC-PERP-USDT",
+                "symbol": internal_symbol,
                 "price": item["p"],          # str
                 "volume": item["v"],         # str
                 "side": item["S"],           # "Buy" or "Sell" — capitalized
