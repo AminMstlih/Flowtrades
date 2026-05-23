@@ -350,7 +350,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -384,11 +384,13 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
 
   const onInteractionRef = useRef(onInteraction);
   const onViewportChangeRef = useRef(onViewportChange);
+  const onVisiblePriceRangeChangeRef = useRef(onVisiblePriceRangeChange);
 
   useEffect(() => {
     onInteractionRef.current = onInteraction;
     onViewportChangeRef.current = onViewportChange;
-  }, [onInteraction, onViewportChange]);
+    onVisiblePriceRangeChangeRef.current = onVisiblePriceRangeChange;
+  }, [onInteraction, onViewportChange, onVisiblePriceRangeChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -523,6 +525,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       }
       
       // Always sync the viewport, even during programmatic fits/initial load
+      // Always sync the viewport, even during programmatic fits/initial load
       if (onViewportChangeRef.current) {
         const logicalRange = chart.timeScale().getVisibleLogicalRange();
         const currentCandles = candlesRef.current;
@@ -561,9 +564,38 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
           }
         }
       }
+      
+      // Actively report the Y-axis range during panning/kinetic scroll so tick sizing can react
+      if (seriesRef.current && onVisiblePriceRangeChangeRef.current && containerRef.current) {
+        const top = seriesRef.current.coordinateToPrice(0);
+        const bottom = seriesRef.current.coordinateToPrice(containerRef.current.clientHeight);
+        if (top !== null && bottom !== null) {
+          onVisiblePriceRangeChangeRef.current({ top, bottom });
+        }
+      }
     });
 
+    const reportVisiblePriceRange = () => {
+      if (seriesRef.current && onVisiblePriceRangeChangeRef.current && containerRef.current) {
+        const top = seriesRef.current.coordinateToPrice(0);
+        const bottom = seriesRef.current.coordinateToPrice(containerRef.current.clientHeight);
+        if (top !== null && bottom !== null) {
+          onVisiblePriceRangeChangeRef.current({ top, bottom });
+        }
+      }
+    };
+
+    containerRef.current.addEventListener('wheel', reportVisiblePriceRange, { passive: true });
+    containerRef.current.addEventListener('pointerup', reportVisiblePriceRange);
+    
+    // Initial report after a short delay to ensure LWC has computed layout
+    setTimeout(reportVisiblePriceRange, 200);
+
     return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('wheel', reportVisiblePriceRange);
+        containerRef.current.removeEventListener('pointerup', reportVisiblePriceRange);
+      }
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;

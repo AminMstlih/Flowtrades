@@ -163,3 +163,29 @@ What We Implemented:
 ✅ New exhaustion tests use real trade ingestion through `FootprintChart` so `midpoint_snapshot` is populated correctly
 ✅ `test_no_midpoint_snapshot_no_crash_no_false_positive` added — covers candle with no trades after midpoint
 ✅ Stale config test assertions updated to match actual config values
+
+✅ Phase 8 Complete - Dynamic Tick Scaling & Chart Continuity
+
+---
+
+## Frontend — Auto-Fit & Dynamic Tick Scaling
+
+✅ **Dynamic `tickSize` scaling linked to Visible Price Range**
+- Replaced static viewport assumptions with a dynamic system. `tickSize` now actively scales based on the exact Y-axis visible price range (`coordinateToPrice`).
+- Added a `ResizeObserver` to `App.jsx` to pass the true DOM `viewportSize` into the ViewModel, breaking the hardcoded 800px viewport trap.
+- Fixed footprint bucket height stretching in `AUTO-FIT` mode by switching `snapTick` to `'nearest'` instead of `'fit'`.
+- Location: `useFootprintViewModel.js`, `App.jsx`, `tickSteps.js`.
+
+✅ **Kinetic Scroll & Panning Volatility Tracking**
+- Integrated LWC's `subscribeVisibleTimeRangeChange` to continuously track kinetic scrolling and panning events.
+- `tickSize` now smoothly drops or increases dynamically as the chart slides into low or high volatility regions without waiting for the kinetic scroll animation to finish.
+- Fixed LWC v4 API error by replacing the removed `getVisiblePriceRange()` method with `coordinateToPrice(0)` and `coordinateToPrice(containerHeight)` to extract the top and bottom screen bounds accurately.
+- Location: `FootprintLwcChart.jsx`.
+
+## Backend — Data Integrity & Chart Continuity
+
+✅ **Candle Gap Bridging (Standard Chart Aesthetics)**
+- Enforced `Open = Previous Close` in the backend footprint engine when sealing discrete candles.
+- This bridges visual gaps between consecutive candles caused by continuous market price drift between OKX trades.
+- Aligns our custom footprint aggregation strictly with standard exchange charting logic (like OKX and TradingView UIs), while strictly preserving pure volume profile footprints (no phantom volume rows).
+- Location: `engine.py` (`add_trade`).

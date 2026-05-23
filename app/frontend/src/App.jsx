@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useUIStore } from './core/store/uiStore';
 import { useFootprintStore } from './core/store/footprintStore';
 import { Header } from './components/Header';
@@ -55,13 +55,32 @@ function App() {
     return () => disconnect();
   }, [wsUrl, connect, disconnect]);
 
+  const chartAreaRef = useRef(null);
+  const [viewportSize, setViewportSize] = useState({ width: 1000, height: 800 });
+  const [visiblePriceRange, setVisiblePriceRange] = useState(null);
+
+  useEffect(() => {
+    if (!chartAreaRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setViewportSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
+    observer.observe(chartAreaRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // ViewModel handles aggregation, tick-sizing, and instrument inference
   const vm = useFootprintViewModel({
     chartData,
     tickSize,
     autoFit,
     tickMode,
-    viewportSize: { width: 1000, height: 800 },
+    viewportSize,
+    visiblePriceRange,
     orderedCandles: chartData.candles,
     transform: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
     userHasPanned: false,
@@ -110,13 +129,14 @@ function App() {
       />
 
       <div className="main-viewport-wrapper">
-        <div className="chart-area" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div className="chart-area" ref={chartAreaRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
           <FootprintLwcChart 
             candles={vm.aggCandles} 
             maxVolumeGlobal={vm.maxVolumeGlobal}
             showBadges={showBadges}
             autoFit={autoFit}
             onViewportChange={setViewportScroll}
+            onVisiblePriceRangeChange={setVisiblePriceRange}
           />
         </div>
       </div>

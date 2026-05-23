@@ -15,6 +15,7 @@ export function useFootprintViewModel({
   autoFit,
   tickMode,
   viewportSize,
+  visiblePriceRange,
   orderedCandles,
   transform,
   userHasPanned,
@@ -124,13 +125,23 @@ export function useFootprintViewModel({
   }, [chartData.last_price, orderedCandles.length, viewportSize.width, viewportSize.height, tickSize, transform, priceLadder]);
 
   const maybeAutoFitTick = useCallback(() => {
-    if (!autoFit || !candleRange || viewportSize.height <= 0) return;
+    if (!autoFit || viewportSize.height <= 0) return;
+    
+    let range = 0;
+    if (visiblePriceRange && typeof visiblePriceRange.top === 'number' && typeof visiblePriceRange.bottom === 'number') {
+      range = Math.max(0, visiblePriceRange.top - visiblePriceRange.bottom);
+    } else if (candleRange) {
+      range = candleRange.range;
+    }
+    
+    if (range <= 0) return;
+
     const rowsAvailable = Math.max(2, Math.floor((viewportSize.height - HEADER_HEIGHT) / CELL_HEIGHT));
     const rowsForRange = Math.max(1, rowsAvailable - 2);
-    const requiredTick = candleRange.range / rowsForRange;
-    const nextTick = snapTick(requiredTick, 'fit');
+    const requiredTick = range / rowsForRange;
+    const nextTick = snapTick(requiredTick, 'nearest');
     if (nextTick !== tickSize) setTickSize(nextTick);
-  }, [autoFit, candleRange, viewportSize.height, tickSize, setTickSize]);
+  }, [autoFit, candleRange, visiblePriceRange, viewportSize.height, tickSize, setTickSize]);
 
   const syncAutoTick = useCallback(() => {
     if (tickMode !== 'auto') return;
