@@ -423,6 +423,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       rightPriceScale: {
         borderColor: 'rgba(30, 52, 72, 0.9)',
         autoScale: true,
+        scaleMargins: {
+          top: 0.02,
+          bottom: 0.02,
+        },
       },
       timeScale: {
         borderColor: 'rgba(30, 52, 72, 0.9)',
@@ -617,7 +621,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       isProgrammaticChangeRef.current = true;
       chartRef.current.timeScale().fitContent();
       // Optional: reset vertical scale to auto
-      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+      chartRef.current.priceScale('right').applyOptions({ 
+        autoScale: true,
+        scaleMargins: { top: 0.02, bottom: 0.02 }
+      });
       setTimeout(() => { isProgrammaticChangeRef.current = false; }, 100);
     }
   }, [autoFit]);
