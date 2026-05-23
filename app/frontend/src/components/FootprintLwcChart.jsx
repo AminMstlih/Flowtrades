@@ -350,7 +350,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -442,8 +442,19 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     });
 
     const paneView = makeFootprintPaneView();
+    
+    // Calculate required decimals based on tick size (e.g. 0.0001 -> 4 decimals)
+    const tickDecimals = tickSize.toString().includes('.') 
+      ? tickSize.toString().split('.')[1].length 
+      : 0;
+
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
+      priceFormat: {
+        type: 'price',
+        precision: tickDecimals,
+        minMove: tickSize,
+      },
     });
 
     chartRef.current = chart;
@@ -470,10 +481,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
         return;
       }
 
-      const open  = Number(data.open).toFixed(1);
-      const high  = Number(data.high).toFixed(1);
-      const low   = Number(data.low).toFixed(1);
-      const close = Number(data.close).toFixed(1);
+      const open  = Number(data.open).toFixed(tickDecimals);
+      const high  = Number(data.high).toFixed(tickDecimals);
+      const low   = Number(data.low).toFixed(tickDecimals);
+      const close = Number(data.close).toFixed(tickDecimals);
 
       // delta = sum of all bucket deltas
       const buckets = data.aggBuckets || [];
@@ -606,10 +617,19 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
   useEffect(() => {
     if (!seriesRef.current || !candles || candles.length === 0) return;
 
+    const tickDecimals = tickSize.toString().includes('.') 
+      ? tickSize.toString().split('.')[1].length 
+      : 0;
+
     // Apply any updated global volume option securely
     seriesRef.current.applyOptions({
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
-      showBadges: showBadges
+      showBadges: showBadges,
+      priceFormat: {
+        type: 'price',
+        precision: tickDecimals,
+        minMove: tickSize,
+      },
     });
 
     const firstCandleTime = mapCandle(candles[0]).time;
@@ -645,7 +665,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     lastCandleCountRef.current = candles.length;
     lastTickSizeRef.current = maxVolumeGlobal;
     lastShowBadgesRef.current = showBadges;
-  }, [candles, mapCandle, maxVolumeGlobal, showBadges]);
+  }, [candles, mapCandle, maxVolumeGlobal, showBadges, tickSize]);
 
   // Handle explicit Auto-Fit trigger from parent
   useEffect(() => {

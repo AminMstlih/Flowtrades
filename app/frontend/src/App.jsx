@@ -135,6 +135,7 @@ function App() {
             maxVolumeGlobal={vm.maxVolumeGlobal}
             showBadges={showBadges}
             autoFit={autoFit}
+            tickSize={tickSize}
             onViewportChange={setViewportScroll}
             onVisiblePriceRangeChange={setVisiblePriceRange}
           />

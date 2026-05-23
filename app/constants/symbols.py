@@ -9,15 +9,15 @@ SYMBOL_MAP = {
         "okx": "BTC-USDT-SWAP",
         "bybit": "BTCUSDT",
     },
-    "ETH-USDT": {
-        "binance": "ETHUSDT",
-        "okx": "ETH-USDT-SWAP",
-        "bybit": "ETHUSDT",
+    "HYPE-USDT": {
+        "binance": "HYPEUSDT",
+        "okx": "HYPE-USDT-SWAP",
+        "bybit": "HYPEUSDT",
     },
-    "SOL-USDT": {
-        "binance": "SOLUSDT",
-        "okx": "SOL-USDT-SWAP",
-        "bybit": "SOLUSDT",
+    "BEAT-USDT": {
+        "binance": "BEATUSDT",
+        "okx": "BEAT-USDT-SWAP",
+        "bybit": "BEATUSDT",
     },
 }
 

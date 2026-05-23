@@ -30,20 +30,20 @@ absorption_price_pct = 0.05
 # Which exchanges to connect to
 enabled = ["okx", "bybit", "binance"]
 # Which symbols to ingest
-symbols = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+symbols = ["BTC-USDT", "HYPE-USDT", "BEAT-USDT"]
 
 [symbols]
   [symbols."BTC-USDT"]
   bucket_size = 1.0
   min_volume = 0.1
 
-  [symbols."ETH-USDT"]
-  bucket_size = 0.1
-  min_volume = 1.0
-
-  [symbols."SOL-USDT"]
+  [symbols."HYPE-USDT"]
   bucket_size = 0.01
   min_volume = 10.0
+
+  [symbols."BEAT-USDT"]
+  bucket_size = 0.0001
+  min_volume = 1000.0
 
 [display]
 # Number of price levels to display simultaneously
