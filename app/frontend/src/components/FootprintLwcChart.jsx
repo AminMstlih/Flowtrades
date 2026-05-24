@@ -156,6 +156,16 @@ function makeFootprintPaneView() {
             if (buckets.length > 0) {
               const maxVol = Math.max(options.maxVolumeGlobal || 1, 1);
 
+              let pocPrice = null;
+              let pocVol = -1;
+              for (const b of buckets) {
+                const tv = (Number(b.buy_vol) || 0) + (Number(b.sell_vol) || 0);
+                if (tv > pocVol) {
+                  pocVol = tv;
+                  pocPrice = b.price;
+                }
+              }
+
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
@@ -188,8 +198,25 @@ function makeFootprintPaneView() {
                 const opacity = Math.min((buy + sell) / maxVol, 1);
                 
                 // background cell tint
-                ctx.fillStyle = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                
+                if (b.flags) {
+                  for (const flag of b.flags) {
+                    if (flag.type === 'IMB') {
+                       const flagOpacity = Math.min(1, Math.max(0.2, (flag.severity || 5) / 10));
+                       bgColor = flag.direction === 'buy' ? `rgba(38, 166, 154, ${flagOpacity * 0.6})` : `rgba(239, 83, 80, ${flagOpacity * 0.6})`;
+                    }
+                  }
+                }
+                
+                ctx.fillStyle = bgColor;
                 ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+
+                if (b.price === pocPrice) {
+                  ctx.strokeStyle = '#FFD700'; // Gold POC
+                  ctx.lineWidth = 1.5;
+                  ctx.strokeRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                }
 
                 // volume bars
                 if (leftBar > 0) {
@@ -284,8 +311,8 @@ function makeFootprintPaneView() {
               const y = priceToCoordinate(price);
               if (y === null) continue;
 
-              // Draw badges outside the right edge of the candle body
-              let offsetX = centerX + bodyWidth / 2 + 6;
+              // Draw badges inside the right edge of the candle body
+              let currentRight = centerX + bodyWidth / 2 - 2;
               
               for (const flag of b.flags) {
                 // Ensure opacity is visible but reflects confidence (severity 1..10 -> opacity 0.3..1.0)
@@ -301,22 +328,34 @@ function makeFootprintPaneView() {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
                 }
                 
-                ctx.font = `600 9px Inter, sans-serif`;
+                // Scale badge size with the row height, but keep it small
+                const badgeFontSize = Math.max(6, Math.min(9, rowH * 0.4));
+                ctx.font = `600 ${badgeFontSize}px Inter, sans-serif`;
+                
                 const textWidth = ctx.measureText(flag.type).width;
-                const paddingX = 4;
+                const paddingX = 2;
                 const boxWidth = textWidth + paddingX * 2;
-                const boxHeight = 14;
+                const boxHeight = Math.max(10, Math.min(14, rowH * 0.8));
+                
+                const boxLeft = currentRight - boxWidth;
+                
+                // Only draw if we have enough space so it doesn't overlap the center numbers
+                // (centerX + 3 is where the buy numbers start, assume max 30px width for numbers)
+                if (boxLeft < centerX + 25) {
+                    continue; // Skip drawing badge if the column is too narrow
+                }
                 
                 ctx.fillStyle = bgColor;
                 ctx.beginPath();
-                ctx.roundRect(offsetX, y - boxHeight / 2, boxWidth, boxHeight, 3);
+                ctx.roundRect(boxLeft, y - boxHeight / 2, boxWidth, boxHeight, 2);
                 ctx.fill();
                 
                 ctx.fillStyle = '#FFFFFF';
                 ctx.textAlign = 'center';
-                ctx.fillText(flag.type, offsetX + boxWidth / 2, y + 3);
+                // Adjust text Y position based on font size to keep it vertically centered
+                ctx.fillText(flag.type, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
                 
-                offsetX += boxWidth + 4; // Spacing for next badge
+                currentRight -= (boxWidth + 2); // Spacing for next badge
               }
             }
           }

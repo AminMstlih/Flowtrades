@@ -146,7 +146,19 @@ class DetectionEngine:
         Flags buckets where one side dominates by imbalance_threshold_pct.
         Now requires relative volume weight + minimum trade count.
         """
-        for price, bucket in candle.buckets.items():
+        # Calculate bucket size from minimum price delta
+        prices = sorted(candle.buckets.keys())
+        if len(prices) < 3:
+            return
+        
+        diffs = [prices[i+1] - prices[i] for i in range(len(prices)-1)]
+        min_diff = min(diffs) if diffs else 1.0
+        
+        # Temporary storage for imbalances
+        imb_candidates = []
+        
+        for price in prices:
+            bucket = candle.buckets[price]
             if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
 
@@ -161,26 +173,57 @@ class DetectionEngine:
             direction = "buy" if imbalance > 0 else "sell"
             confidence = self._confidence_factor(bucket, candle_total_vol)
             
-            # Severity: scales with both imbalance strength and confidence
             raw_severity = (abs_imbalance - self.imbalance_threshold_pct) / (100.0 - self.imbalance_threshold_pct) * 8.0 + 2.0
             severity = min(10.0, max(1.0, raw_severity * confidence))
 
-            if severity < 2.0:
-                continue
+            if severity >= 2.0:
+                imb_candidates.append({
+                    "price": price,
+                    "direction": direction,
+                    "severity": severity,
+                    "bucket": bucket,
+                    "imbalance": imbalance,
+                    "confidence": confidence
+                })
 
-            flags[price].append(DetectionFlag(
+        # Find Stacked Imbalances (>= 3 consecutive levels)
+        if not imb_candidates:
+            return
+
+        stacks = []
+        current_stack = [imb_candidates[0]]
+        
+        for i in range(1, len(imb_candidates)):
+            prev = current_stack[-1]
+            curr = imb_candidates[i]
+            
+            is_consecutive = (curr["price"] - prev["price"]) <= min_diff * 1.05
+            is_same_direction = curr["direction"] == prev["direction"]
+            
+            if is_consecutive and is_same_direction:
+                current_stack.append(curr)
+            else:
+                if len(current_stack) >= 3:
+                    stacks.extend(current_stack)
+                current_stack = [curr]
+                
+        if len(current_stack) >= 3:
+            stacks.extend(current_stack)
+            
+        for item in stacks:
+            flags[item["price"]].append(DetectionFlag(
                 type=DetectionType.IMBALANCE,
-                direction=direction,
-                severity=round(severity, 1),
-                label=f"Aggressive {'buyers' if direction == 'buy' else 'sellers'} dominating — passive orders being consumed",
+                direction=item["direction"],
+                severity=round(item["severity"], 1),
+                label=f"Stacked {item['direction']} imbalance (>=3 levels) — aggressive market orders sweeping the book",
                 metadata={
-                    "imbalance_pct": round(imbalance, 1),
-                    "buy_vol": round(bucket.buy_vol, 4),
-                    "sell_vol": round(bucket.sell_vol, 4),
-                    "total_vol": round(bucket.total_vol, 4),
-                    "weight_pct": round((bucket.total_vol / candle_total_vol) * 100, 1),
-                    "trade_count": bucket.trade_count,
-                    "confidence": round(confidence, 2),
+                    "imbalance_pct": round(item["imbalance"], 1),
+                    "buy_vol": round(item["bucket"].buy_vol, 4),
+                    "sell_vol": round(item["bucket"].sell_vol, 4),
+                    "total_vol": round(item["bucket"].total_vol, 4),
+                    "weight_pct": round((item["bucket"].total_vol / candle_total_vol) * 100, 1),
+                    "trade_count": item["bucket"].trade_count,
+                    "confidence": round(item["confidence"], 2),
                 },
             ))
 
@@ -210,15 +253,30 @@ class DetectionEngine:
 
         price_range_pct = ((candle.high - candle.low) / candle.high) * 100.0
 
+        rng = candle.high - candle.low
+        top_zone = candle.high - rng * 0.25
+        bot_zone = candle.low + rng * 0.25
+
         for price, bucket in candle.buckets.items():
             if not self._bucket_qualifies(bucket, candle_total_vol):
                 continue
             if bucket.total_vol < vol_threshold:
                 continue
 
+            # Extremity Filter & Direction Mapping
+            if price >= top_zone:
+                direction = "sell"
+                label = "Sell Absorption (Top 25%) — buyers trapped at the highs against limit sellers"
+            elif price <= bot_zone:
+                direction = "buy"
+                label = "Buy Absorption (Bottom 25%) — sellers trapped at the lows against limit buyers"
+            else:
+                # Noise in the middle of the candle
+                continue
+
             # Absorption: high volume + low overall price movement
             if price_range_pct > self.absorption_price_pct * 10:
-                bucket_price_range = (candle.high - candle.low) / price
+                bucket_price_range = rng / price
                 if bucket_price_range > self.absorption_price_pct / 100.0:
                     continue
 
@@ -231,9 +289,9 @@ class DetectionEngine:
 
             flags[price].append(DetectionFlag(
                 type=DetectionType.ABSORPTION,
-                direction=None,
+                direction=direction,
                 severity=round(severity, 1),
-                label="High volume, low movement — large player may be defending this level",
+                label=label,
                 metadata={
                     "total_vol": round(bucket.total_vol, 4),
                     "vol_threshold": round(vol_threshold, 4),
@@ -312,17 +370,37 @@ class DetectionEngine:
 
             # Direction of the exhausted push (the early dominant side)
             exhausted_side = "buy" if early_delta > 0 else "sell"
+            
+            # Extremity Filter for Exhaustion
+            if candle.high is not None and candle.low is not None:
+                rng = candle.high - candle.low
+                top_zone = candle.high - rng * 0.25
+                bot_zone = candle.low + rng * 0.25
+                
+                # Buy exhaustion must happen at the high
+                if exhausted_side == "buy" and price < top_zone:
+                    continue
+                # Sell exhaustion must happen at the low
+                if exhausted_side == "sell" and price > bot_zone:
+                    continue
+            
             confidence = self._confidence_factor(bucket, candle_total_vol)
             severity = min(10.0, max(1.0, (early_imb * 5.0 + counter_ratio * 3.0) * confidence))
 
             if severity < 2.0:
                 continue
 
+            label = (
+                "Buy Exhaustion (Top 25%) — buyers pushed but got stuffed, momentum reversed" 
+                if exhausted_side == "buy" else 
+                "Sell Exhaustion (Bottom 25%) — sellers pushed but got stuffed, momentum reversed"
+            )
+
             flags[price].append(DetectionFlag(
                 type=DetectionType.EXHAUSTION,
                 direction=exhausted_side,
                 severity=round(severity, 1),
-                label=f"{'Buy' if exhausted_side == 'buy' else 'Sell'} push in first half reversed by counter-pressure — momentum may be weakening",
+                label=label,
                 metadata={
                     "early_delta": round(early_delta, 4),
                     "late_delta": round(late_delta, 4),

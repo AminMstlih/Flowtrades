@@ -65,14 +65,16 @@ class TestImbalanceDetection:
         Math: delta=78, total=100, imbalance=78% (above 70% threshold)."""
         candle = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 89.0, "sell_vol": 11.0},
+            {"price": 67251.0, "buy_vol": 89.0, "sell_vol": 11.0},
+            {"price": 67252.0, "buy_vol": 89.0, "sell_vol": 11.0},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
         flags = engine.detect(candle)
-        
-        assert len(flags[67250.0]) == 1
-        flag = flags[67250.0][0]
-        assert flag.type == DetectionType.IMBALANCE
+    
+        imb_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.IMBALANCE]
+        assert len(imb_flags) == 1
+        flag = imb_flags[0]
         assert flag.direction == "buy"
         assert flag.severity >= 1.0
 
@@ -81,42 +83,52 @@ class TestImbalanceDetection:
         Math: delta=-77, total=100, imbalance=-77% (above 70% threshold)."""
         candle = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 11.5, "sell_vol": 88.5},
+            {"price": 67249.0, "buy_vol": 11.5, "sell_vol": 88.5},
+            {"price": 67248.0, "buy_vol": 11.5, "sell_vol": 88.5},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
         flags = engine.detect(candle)
-        
-        assert len(flags[67250.0]) == 1
-        flag = flags[67250.0][0]
-        assert flag.type == DetectionType.IMBALANCE
+    
+        imb_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.IMBALANCE]
+        assert len(imb_flags) == 1
+        flag = imb_flags[0]
         assert flag.direction == "sell"
 
     def test_below_threshold_not_flagged(self):
         """50/50 split → no imbalance flag."""
         candle = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 25.0, "sell_vol": 25.0},
+            {"price": 67251.0, "buy_vol": 25.0, "sell_vol": 25.0},
+            {"price": 67252.0, "buy_vol": 25.0, "sell_vol": 25.0},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
         flags = engine.detect(candle)
         
-        assert len(flags[67250.0]) == 0
+        imb_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.IMBALANCE]
+        assert len(imb_flags) == 0
 
     def test_below_threshold_65_pct_not_flagged(self):
         """65% imbalance → below 70% threshold, not flagged."""
         candle = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 32.5, "sell_vol": 17.5},
+            {"price": 67251.0, "buy_vol": 32.5, "sell_vol": 17.5},
+            {"price": 67252.0, "buy_vol": 32.5, "sell_vol": 17.5},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
         flags = engine.detect(candle)
         
-        assert len(flags[67250.0]) == 0
+        imb_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.IMBALANCE]
+        assert len(imb_flags) == 0
 
     def test_low_volume_filtered(self):
         """High imbalance but below min volume → not flagged."""
         candle = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 0.3, "sell_vol": 0.1},
+            {"price": 67251.0, "buy_vol": 0.3, "sell_vol": 0.1},
+            {"price": 67252.0, "buy_vol": 0.3, "sell_vol": 0.1},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
@@ -129,9 +141,13 @@ class TestImbalanceDetection:
         Math: candle_100: delta=10/total=10 = 100%. candle_75: delta=30/total=40 = 75%."""
         candle_100 = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 10.0, "sell_vol": 0.0},
+            {"price": 67251.0, "buy_vol": 10.0, "sell_vol": 0.0},
+            {"price": 67252.0, "buy_vol": 10.0, "sell_vol": 0.0},
         ])
         candle_75 = make_candle_with_buckets([
             {"price": 67250.0, "buy_vol": 35.0, "sell_vol": 5.0},
+            {"price": 67251.0, "buy_vol": 35.0, "sell_vol": 5.0},
+            {"price": 67252.0, "buy_vol": 35.0, "sell_vol": 5.0},
         ])
         
         engine = DetectionEngine(imbalance_threshold_pct=70.0, min_volume_per_bucket_btc=0.5)
@@ -152,17 +168,17 @@ class TestAbsorptionDetection:
         candle = FootprintCandle(
             start_time_ms=1000000,
             end_time_ms=1060000,
-            open=67250.0,
-            high=67250.5,
-            low=67249.5,
-            close=67250.2,
+            open=67248.0,
+            high=67252.0,
+            low=67248.0,
+            close=67249.0,
         )
         
         # Add buckets with varying volumes
         total_buy = 0.0
         total_sell = 0.0
-        for i, vol in enumerate([5.0, 10.0, 50.0, 5.0, 3.0]):
-            price = 67248.0 + i
+        # Place the massive 50.0 volume at the HIGH (67252.0) to trigger sell absorption
+        for price, vol in zip([67248.0, 67249.0, 67250.0, 67251.0, 67252.0], [5.0, 10.0, 5.0, 3.0, 50.0]):
             bucket = PriceBucket(price=price)
             bucket.add_buy(vol / 2)
             bucket.add_sell(vol / 2)
@@ -180,11 +196,11 @@ class TestAbsorptionDetection:
         )
         flags = engine.detect(candle)
         
-        # The 50.0 volume bucket should be flagged
-        assert len(flags[67250.0]) > 0
-        absorption_flags = [f for f in flags[67250.0] if f.type == DetectionType.ABSORPTION]
+        # The 50.0 volume bucket at 67252.0 should be flagged
+        assert len(flags[67252.0]) > 0
+        absorption_flags = [f for f in flags[67252.0] if f.type == DetectionType.ABSORPTION]
         assert len(absorption_flags) == 1
-        assert absorption_flags[0].direction is None
+        assert absorption_flags[0].direction == "sell"
 
     def test_low_volume_not_flagged(self):
         """Low volume bucket → not absorption even in tight range."""
@@ -264,14 +280,14 @@ class TestExhaustionDetection:
         """
         candle = self._make_candle_with_midpoint(
             early_trades=[
-                {"price": 67250.0, "volume": 40.0, "side": "buy", "offset_ms": 10_000},
-                {"price": 67250.0, "volume": 5.0,  "side": "sell", "offset_ms": 20_000},
+                {"price": 67251.0, "volume": 40.0, "side": "buy", "offset_ms": 10_000},
+                {"price": 67251.0, "volume": 5.0,  "side": "sell", "offset_ms": 20_000},
                 # filler buckets so candle_total_vol is meaningful
                 {"price": 67249.0, "volume": 2.0, "side": "buy", "offset_ms": 30_000},
-                {"price": 67251.0, "volume": 2.0, "side": "sell", "offset_ms": 40_000},
+                {"price": 67250.0, "volume": 2.0, "side": "sell", "offset_ms": 40_000},
             ],
             late_trades=[
-                {"price": 67250.0, "volume": 35.0, "side": "sell", "offset_ms": 10_000},
+                {"price": 67251.0, "volume": 35.0, "side": "sell", "offset_ms": 10_000},
                 {"price": 67249.0, "volume": 1.0, "side": "buy", "offset_ms": 20_000},
             ],
         )
@@ -279,7 +295,7 @@ class TestExhaustionDetection:
         engine = DetectionEngine()
         flags = engine.detect(candle)
 
-        exh_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.EXHAUSTION]
+        exh_flags = [f for f in flags.get(67251.0, []) if f.type == DetectionType.EXHAUSTION]
         assert len(exh_flags) == 1
         assert exh_flags[0].direction == "buy"
 
@@ -289,21 +305,21 @@ class TestExhaustionDetection:
         """
         candle = self._make_candle_with_midpoint(
             early_trades=[
-                {"price": 67250.0, "volume": 5.0,  "side": "buy",  "offset_ms": 10_000},
-                {"price": 67250.0, "volume": 40.0, "side": "sell", "offset_ms": 20_000},
-                {"price": 67249.0, "volume": 2.0, "side": "buy",  "offset_ms": 30_000},
+                {"price": 67249.0, "volume": 5.0,  "side": "buy",  "offset_ms": 10_000},
+                {"price": 67249.0, "volume": 40.0, "side": "sell", "offset_ms": 20_000},
+                {"price": 67250.0, "volume": 2.0, "side": "buy",  "offset_ms": 30_000},
                 {"price": 67251.0, "volume": 2.0, "side": "sell", "offset_ms": 40_000},
             ],
             late_trades=[
-                {"price": 67250.0, "volume": 35.0, "side": "buy",  "offset_ms": 10_000},
-                {"price": 67249.0, "volume": 1.0, "side": "sell", "offset_ms": 20_000},
+                {"price": 67249.0, "volume": 35.0, "side": "buy",  "offset_ms": 10_000},
+                {"price": 67250.0, "volume": 1.0, "side": "sell", "offset_ms": 20_000},
             ],
         )
 
         engine = DetectionEngine()
         flags = engine.detect(candle)
 
-        exh_flags = [f for f in flags.get(67250.0, []) if f.type == DetectionType.EXHAUSTION]
+        exh_flags = [f for f in flags.get(67249.0, []) if f.type == DetectionType.EXHAUSTION]
         assert len(exh_flags) == 1
         assert exh_flags[0].direction == "sell"
 
@@ -371,20 +387,29 @@ class TestMultipleDetections:
         start_ms = 1_000_000
         mid_ms = start_ms + 150_000
 
-        # Early half: strong buy at 67250
+        # Early half: strong buy at 67250, 67251, 67252
         chart.add_trade(ts_ms=start_ms + 10_000, price=67250.0, volume=45.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 11_000, price=67251.0, volume=45.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 12_000, price=67252.0, volume=45.0, side="buy",  exchange="okx")
         chart.add_trade(ts_ms=start_ms + 20_000, price=67250.0, volume=5.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 21_000, price=67251.0, volume=5.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=start_ms + 22_000, price=67252.0, volume=5.0,  side="sell", exchange="okx")
         chart.add_trade(ts_ms=start_ms + 30_000, price=67248.0, volume=2.0,  side="buy",  exchange="okx")
+        
         # Late half: still buy dominant (no flip)
         chart.add_trade(ts_ms=mid_ms + 10_000, price=67250.0, volume=35.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 11_000, price=67251.0, volume=35.0, side="buy",  exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 12_000, price=67252.0, volume=35.0, side="buy",  exchange="okx")
         chart.add_trade(ts_ms=mid_ms + 20_000, price=67250.0, volume=4.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 21_000, price=67251.0, volume=4.0,  side="sell", exchange="okx")
+        chart.add_trade(ts_ms=mid_ms + 22_000, price=67252.0, volume=4.0,  side="sell", exchange="okx")
         chart.add_trade(ts_ms=mid_ms + 30_000, price=67248.0, volume=1.0,  side="buy",  exchange="okx")
-
+    
         candle = chart.get_snapshot()[0]
-
+    
         engine = DetectionEngine(imbalance_threshold_pct=70.0)
         flags = engine.detect(candle)
-
+    
         flag_types = {f.type for f in flags.get(67250.0, [])}
         assert DetectionType.IMBALANCE in flag_types
         assert DetectionType.EXHAUSTION not in flag_types
