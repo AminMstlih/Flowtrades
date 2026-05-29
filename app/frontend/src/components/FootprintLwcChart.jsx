@@ -285,9 +285,9 @@ function makeFootprintPaneView() {
               const sell = Number(b.sell_vol) || 0;
               if (buy + sell <= 0 || rowH <= 8) continue;
 
-              // Scale font size by both row height AND lane width to prevent overlaps
-              // Raised maximum font clamp to 20px and optimized scaling factor to 0.18 for premium legibility
-              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.5, laneWidth * 0.18));
+              // Scale font size dynamically by both row height AND lane width to prevent overlaps.
+              // Adjusted horizontal scaling factor to 0.125 to ensure text floats beautifully within the hollow body outlines with comfortable margins.
+              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.5, laneWidth * 0.125));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
