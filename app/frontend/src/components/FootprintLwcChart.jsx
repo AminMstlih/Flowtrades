@@ -213,8 +213,12 @@ function makeFootprintPaneView() {
                 ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
 
                 if (b.price === pocPrice) {
-                  ctx.strokeStyle = '#FFD700'; // Gold POC
-                  ctx.lineWidth = 1.5;
+                  // High-tech cyber-cyan glass backplate + thin precise neon stroke for Point of Control (POC)
+                  ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+                  ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+
+                  ctx.strokeStyle = '#00e5ff';
+                  ctx.lineWidth = 1;
                   ctx.strokeRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
                 }
 
