@@ -4,6 +4,7 @@ import { useFootprintStore } from './core/store/footprintStore';
 import { Header } from './components/Header';
 import { FootprintLwcChart } from './components/FootprintLwcChart';
 import { DeltaPane } from './components/DeltaPane';
+import { SymbolSidebar } from './components/SymbolSidebar';
 import { perfMonitor } from './utils/perfMonitor';
 import { useFootprintViewModel } from './hooks/useFootprintViewModel';
 
@@ -19,7 +20,7 @@ const WS_URL_BASE = getWsUrl();
 function App() {
   const {
     tickSize, tickMode, autoFit, timeframeWindow, showBadges, viewportScroll,
-    symbol, availableSymbols,
+    symbol, availableSymbols, isSidebarOpen,
     setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll,
     setSymbol, setAvailableSymbols
   } = useUIStore();
@@ -108,7 +109,7 @@ function App() {
   }, [vm.syncAutoTick, autoFit, chartData.last_price, tickMode, tickSize]);
 
   return (
-    <div className="dashboard">
+    <div className={`dashboard ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       <Header
         state={chartData}
         status={status}
@@ -140,6 +141,7 @@ function App() {
             onVisiblePriceRangeChange={setVisiblePriceRange}
           />
         </div>
+        <SymbolSidebar />
       </div>
 
       <div className="fixed-bottom-panels">

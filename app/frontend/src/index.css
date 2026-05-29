@@ -1208,3 +1208,444 @@ body {
   font-weight: 600;
   text-align: right;
 }
+
+/* ========================================
+   SYMBOL SIDEBAR & WATCHLIST HUB
+   ======================================== */
+
+.symbol-sidebar {
+  width: 320px;
+  height: 100%;
+  background: rgba(10, 18, 30, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.symbol-sidebar.closed {
+  transform: translateX(100%);
+  width: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-top-row h3 {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+
+.close-btn:hover {
+  color: var(--accent-orange);
+}
+
+.search-bar-container {
+  width: 100%;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-search-input:focus {
+  border-color: rgba(0, 230, 118, 0.5);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.15);
+}
+
+.watchlist-tabs-row {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.symbol-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.symbol-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.symbol-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  text-align: center;
+  font-family: var(--font-sans);
+}
+
+.empty-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.empty-state p {
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.symbol-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+}
+
+.symbol-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(-2px);
+}
+
+.symbol-card.active {
+  background: rgba(0, 230, 118, 0.04);
+  border-color: rgba(0, 230, 118, 0.3);
+  box-shadow: inset 3px 0 0 #00e676;
+}
+
+.card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.star-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.15);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.star-btn:hover {
+  color: rgba(255, 193, 7, 0.6);
+  transform: scale(1.15);
+}
+
+.star-btn.fav {
+  color: #ffc107;
+  text-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+}
+
+.symbol-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.symbol-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.symbol-status {
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.active-tag {
+  color: #00e676;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.05em;
+}
+
+.pulse-dot {
+  width: 5px;
+  height: 5px;
+  background-color: #00e676;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 6px #00e676;
+  animation: ex-pulse 1.5s infinite;
+}
+
+@keyframes ex-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(0, 230, 118, 0.8);
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+}
+
+.inactive-tag {
+  color: var(--text-muted);
+}
+
+.card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.symbol-price {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.card-exchange-badges {
+  display: flex;
+  gap: 3px;
+}
+
+.ex-mini-badge {
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  padding: 0px 3px;
+  text-transform: uppercase;
+}
+
+/* Connection Health HUD (Bottom) */
+.sidebar-hud {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud-title {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+}
+
+.hud-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+}
+
+.hud-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.hud-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.hud-badge.connected {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.15);
+}
+
+.hud-badge.disconnected {
+  color: #ff1744;
+  background: rgba(255, 23, 68, 0.08);
+  border: 1px solid rgba(255, 23, 68, 0.15);
+}
+
+.hud-exchanges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.hud-exchange-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.hud-ex-indicator {
+  width: 4px;
+  height: 12px;
+  border-radius: 1px;
+}
+
+.hud-exchange-item.active {
+  border-color: rgba(0, 230, 118, 0.2);
+  background: rgba(0, 230, 118, 0.02);
+}
+
+.hud-exchange-item.active .hud-ex-indicator {
+  background: #00e676;
+  box-shadow: 0 0 6px #00e676;
+}
+
+.hud-exchange-item.inactive .hud-ex-indicator {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hud-ex-details {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+}
+
+.ex-name {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.ex-status {
+  font-size: 0.45rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.hud-exchange-item.active .ex-status {
+  color: #00e676;
+}
+
+/* Adjust Main Layout side-by-side */
+.main-viewport-wrapper {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: calc(100vh - 132px); /* Header 52px + Bottom Pane 80px */
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard.sidebar-open .fixed-bottom-panels {
+  right: 320px;
+}
+
+.dashboard .fixed-bottom-panels {
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard.sidebar-open .price-axis-sidebar {
+  right: 320px;
+}
+
+/* Mobile & Tablet Specific Overrides for Sidebar */
+@media (max-width: 1024px) {
+  .symbol-sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+  }
+  
+  .dashboard.sidebar-open .fixed-bottom-panels {
+    right: 0;
+  }
+}
+

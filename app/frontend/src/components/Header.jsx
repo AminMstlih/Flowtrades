@@ -1,8 +1,10 @@
 import React from 'react';
 import { TICK_STEPS, snapTick } from '../utils/tickSteps';
 import { formatPriceLike } from '../utils/formatVol';
+import { useUIStore } from '../core/store/uiStore';
 
 export function Header({ state, status, instrument, tickSize, tickOptions = TICK_STEPS, setTickSize, setTickMode, autoFit, onAutoFitToggle, timeframeWindow, setTimeframeWindow, showBadges, setShowBadges, symbol, availableSymbols = [], setSymbol }) {
+  const { isSidebarOpen, setIsSidebarOpen } = useUIStore();
   const { last_price, window_sec, total_trades, total_candles, exchanges } = state;
 
   // Map status to display values
@@ -32,28 +34,28 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
       <div className="header-right">
         <div className="controls-row">
           <div className="control-group">
-            <select
-              className="symbol-selector"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
+            <div
+              className={`auto-fit-badge markets-toggle-btn ${isSidebarOpen ? 'active' : 'inactive'}`}
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title="Toggle Symbol Hub & Watchlist"
               style={{
-                background: '#1e3448',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.1)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '16px',
                 fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
                 cursor: 'pointer',
-                outline: 'none'
+                background: isSidebarOpen ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.05)',
+                color: isSidebarOpen ? '#00e676' : '#ffffff',
+                border: isSidebarOpen ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '13px',
+                transition: 'all 0.2s ease-in-out'
               }}
             >
-              {availableSymbols.map((sym) => (
-                <option key={sym} value={sym}>
-                  {sym}
-                </option>
-              ))}
-            </select>
+              <span>🏛️</span>
+              <span>MARKETS ({symbol})</span>
+            </div>
           </div>
 
           <div className="control-group">
