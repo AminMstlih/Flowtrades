@@ -1,5 +1,6 @@
 import { createChart } from 'lightweight-charts';
 import { useEffect, useMemo, useRef, useCallback } from 'react';
+import { snapTick } from '../utils/tickSteps';
 
 function defaultOptions() {
   return {
@@ -169,7 +170,7 @@ function makeFootprintPaneView() {
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
-              const barHeight = Math.max(2, rowH * 0.55);
+              const barHeight = Math.max(2, rowH * 0.65);
 
               // Cull to viewport price range (not candle OHLC range).
               // This correctly handles: long wicks, cross-exchange buckets outside OHLC,
@@ -197,8 +198,8 @@ function makeFootprintPaneView() {
 
                 const opacity = Math.min((buy + sell) / maxVol, 1);
                 
-                // background cell tint
-                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                // background cell tint (high-fidelity 22% opacity weights)
+                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.22})` : `rgba(239, 83, 80, ${opacity * 0.22})`;
                 
                 if (b.flags) {
                   for (const flag of b.flags) {
@@ -664,8 +665,16 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
   useEffect(() => {
     if (!seriesRef.current || !candles || candles.length === 0) return;
 
-    const tickDecimals = tickSize.toString().includes('.') 
-      ? tickSize.toString().split('.')[1].length 
+    // Defensive LWC Crash Guard: Ensure minMove is never larger than the asset price itself
+    // to prevent lightweight-charts internal "unexpected base" scale projection assertion crash.
+    const firstPrice = Number(candles[0].close) || 1;
+    let safeMinMove = tickSize;
+    if (safeMinMove >= firstPrice) {
+      safeMinMove = snapTick(firstPrice * 0.0005, 'nearest');
+    }
+
+    const tickDecimals = safeMinMove.toString().includes('.') 
+      ? safeMinMove.toString().split('.')[1].length 
       : 0;
 
     // Apply any updated global volume option securely
@@ -675,7 +684,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
       priceFormat: {
         type: 'price',
         precision: tickDecimals,
-        minMove: tickSize,
+        minMove: safeMinMove,
       },
     });
 
