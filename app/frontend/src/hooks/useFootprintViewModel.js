@@ -144,10 +144,10 @@ export function useFootprintViewModel({
     
     if (range <= 0) return;
 
-    // Target a highly readable, premium 38px average cell height in auto-fit mode.
-    // This scales tick sizes up to merge loose intermediate price ticks, resulting in taller, 
-    // solid columns and bolder, highly readable numbers, completely auto-adjusting to different screens.
-    const targetCellHeight = 38;
+    // Target a highly detailed, tightly packed 22px average cell height in auto-fit mode.
+    // This scales tick sizes down to provide much more granular price detail (smaller tick values / more cells),
+    // keeping them tightly packed ("lebih rapet") vertically on the screen.
+    const targetCellHeight = 22;
     const rowsAvailable = Math.max(2, Math.floor((viewportSize.height - HEADER_HEIGHT) / targetCellHeight));
     const rowsForRange = Math.max(1, rowsAvailable - 2);
     const requiredTick = range / rowsForRange;
