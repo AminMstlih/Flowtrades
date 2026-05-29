@@ -1,50 +1,42 @@
-# Flowtrades
+<p align="center">
+  <img src="https://img.shields.io/badge/FLOWTRADES-%E2%9A%A1-00e5ff?style=for-the-badge&labelColor=0D1B2A&color=00e5ff" height="35" />
+</p>
 
-Real-time BTC order flow visualization across Binance, OKX, and Bybit exchanges.
+<h1 align="center">⚡ Flowtrades — Institutional Order Flow Terminal</h1>
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/fa3eef6c-a4bf-4311-8a4a-0bb7208aec88" />
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4ad8a6ae-9643-4a04-82b1-c5918cebd33a" />
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4ff25078-30f8-4dc2-bbfa-b562ee0bbae1" />
+<p align="center">
+  <strong>Real-time order flow aggregation, pattern detection, and Canvas footprints at 60 FPS.</strong>
+</p>
 
-## Quick Start
+<p align="center">
+  <a href="https://github.com/AminMstlih/Flowtrades/actions"><img src="https://img.shields.io/badge/BUILD-PASSING-00e676?style=for-the-badge&logo=github-actions&logoColor=fff&labelColor=1E3448" alt="Build Status" /></a>
+  <a href="https://github.com/AminMstlih/Flowtrades"><img src="https://img.shields.io/badge/STABILITY-STABLE-00e5ff?style=for-the-badge&logo=statuspage&logoColor=fff&labelColor=1E3448" alt="Stability" /></a>
+  <a href="https://github.com/AminMstlih/Flowtrades"><img src="https://img.shields.io/badge/UI-HUD_GLASS-ff9f1c?style=for-the-badge&logo=css3&logoColor=fff&labelColor=1E3448" alt="UI Style" /></a>
+  <a href="https://github.com/AminMstlih/Flowtrades/blob/main/LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-2196f3?style=for-the-badge&logo=mit&logoColor=fff&labelColor=1E3448" alt="License" /></a>
+</p>
 
-### For Development (Hot Reload)
-```bash
-cd btc-orderflow
-python dev_runner.py
-```
-Access: http://localhost:5173
+<p align="center">
+  <a href="https://github.com/AminMstlih/Flowtrades"><img src="https://img.shields.io/badge/EXCHANGES-OKX_%E2%80%A2_BYBIT_%E2%80%A2_BINANCE-7209b7?style=for-the-badge&logo=coingecko&logoColor=fff&labelColor=1E3448" alt="Exchanges Connected" /></a>
+</p>
 
-### For Production (Single Server) ⭐
-```bash
-cd btc-orderflow
-python prod_runner.py
-```
-Access: http://localhost:8000
+---
 
-## Documentation
+> [!NOTE]
+> **NO SIGNALS. NO LAGGING INDICATORS. NO NOISE. JUST RAW EXECUTED CONTRACT DATA.**
+>
+> Flowtrades normalizes high-frequency WebSockets streams directly from major perpetual futures exchanges, resolving institutional-grade footprint volume ladders, volume-delta imbalances, and order book absorption wicks.
 
-See [btc-orderflow/DEV_GUIDE.md](btc-orderflow/DEV_GUIDE.md) for detailed setup instructions.
+<details>
+  <summary>📸 Click to view Terminal Interface Screenshots</summary>
+  <br/>
+  <p align="center">
+    <img width="100%" alt="Flowtrades Dashboard" src="https://github.com/user-attachments/assets/fa3eef6c-a4bf-4311-8a4a-0bb7208aec88" />
+    <img width="100%" alt="Footprint Detail View" src="https://github.com/user-attachments/assets/4ad8a6ae-9643-4a04-82b1-c5918cebd33a" />
+    <img width="100%" alt="Order Book Imbalances" src="https://github.com/user-attachments/assets/4ff25078-30f8-4dc2-bbfa-b562ee0bbae1" />
+  </p>
+</details>
 
-## Features
-
-- 🔄 Real-time order flow aggregation from multiple exchanges
-- 📊 Interactive footprint chart with price ladder
-- 🎯 Detection of large trades, imbalances, and absorption
-- 🚀 Production-ready single-server deployment
-- 🔥 Development mode with hot reload
-
-## Architecture
-
-```
-Exchange APIs → Normalization → Trade Bus → Aggregation → FastAPI Server → React Frontend
-                                                    ↕
-                                              WebSocket Broadcast
-```
-
-# Flowtrades ⚡
-
-> **Real order flow. No signals. No noise. Just what the market is actually doing.**
+---
 
 A lightweight, real-time BTC order flow visualization tool built for retail traders who are tired of lagging indicators and fake signal providers. Flowtrades pulls live executed trade data from the biggest perpetual futures exchanges and shows you the actual buying and selling pressure at each price level.
 
