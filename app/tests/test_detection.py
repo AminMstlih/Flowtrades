@@ -227,6 +227,45 @@ class TestAbsorptionDetection:
         
         assert len(flags[67250.0]) == 0
 
+    def test_absorption_large_range_not_flagged(self):
+        """High volume bucket in a wide range candle → NOT absorption."""
+        # Create candle with large price range: high - low = 100 USDT (at ~67200, which is ~0.15%, above 0.05% threshold)
+        candle = FootprintCandle(
+            start_time_ms=1000000,
+            end_time_ms=1060000,
+            open=67200.0,
+            high=67300.0,
+            low=67200.0,
+            close=67250.0,
+        )
+        
+        # Add buckets with varying volumes
+        total_buy = 0.0
+        total_sell = 0.0
+        # Place the massive 50.0 volume at the HIGH (67300.0)
+        for price, vol in zip([67200.0, 67225.0, 67250.0, 67275.0, 67300.0], [5.0, 10.0, 5.0, 3.0, 50.0]):
+            bucket = PriceBucket(price=price)
+            bucket.add_buy(vol / 2)
+            bucket.add_sell(vol / 2)
+            candle.buckets[price] = bucket
+            total_buy += vol / 2
+            total_sell += vol / 2
+        # Set candle-level volumes
+        candle.buy_vol = total_buy
+        candle.sell_vol = total_sell
+        
+        engine = DetectionEngine(
+            absorption_vol_percentile=75.0,
+            absorption_price_pct=0.05,
+            min_volume_per_bucket_btc=0.5,
+        )
+        flags = engine.detect(candle)
+        
+        # Should not flag absorption because candle price range (0.149%) > threshold (0.05%)
+        absorption_flags = [f for f in flags.get(67300.0, []) if f.type == DetectionType.ABSORPTION]
+        assert len(absorption_flags) == 0
+
+
 
 # ── Exhaustion Detection Tests ────────────────────────────────────
 

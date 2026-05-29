@@ -275,10 +275,8 @@ class DetectionEngine:
                 continue
 
             # Absorption: high volume + low overall price movement
-            if price_range_pct > self.absorption_price_pct * 10:
-                bucket_price_range = rng / price
-                if bucket_price_range > self.absorption_price_pct / 100.0:
-                    continue
+            if price_range_pct > self.absorption_price_pct:
+                continue
 
             confidence = self._confidence_factor(bucket, candle_total_vol)
             vol_ratio = bucket.total_vol / vol_threshold

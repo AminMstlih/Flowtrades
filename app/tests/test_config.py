@@ -11,11 +11,11 @@ class TestConfigDefaults:
     def test_default_config_loads(self):
         """Default config should be valid with sensible defaults."""
         config = AppConfig()
-        assert config.aggregation.bucket_size_usd == 1.0
+        assert config.symbols["BTC-USDT"].bucket_size == 1.0
         assert config.aggregation.default_window == 5
         assert config.aggregation.time_windows_minutes == [1, 5, 15]
         assert config.detection.imbalance_threshold_pct == 85
-        assert config.detection.min_volume_per_bucket_btc == 0.1
+        assert config.symbols["BTC-USDT"].min_volume == 0.1
         assert config.display.rows == 20
         assert config.display.refresh_rate_ms == 500
         assert config.exchanges.enabled == ["binance"]
@@ -31,11 +31,11 @@ class TestConfigDefaults:
 class TestConfigValidation:
     def test_invalid_bucket_size(self):
         with pytest.raises(Exception):
-            AppConfig(aggregation={"bucket_size_usd": 0})
+            AppConfig(symbols={"BTC-USDT": {"bucket_size": 0}})
 
     def test_negative_bucket_size(self):
         with pytest.raises(Exception):
-            AppConfig(aggregation={"bucket_size_usd": -1.0})
+            AppConfig(symbols={"BTC-USDT": {"bucket_size": -1.0}})
 
     def test_empty_time_windows(self):
         with pytest.raises(Exception):
@@ -84,9 +84,9 @@ class TestConfigLoad:
         if config_path.exists():
             config = load_config(config_path)
             assert isinstance(config, AppConfig)
-            assert config.aggregation.bucket_size_usd > 0
+            assert config.symbols["BTC-USDT"].bucket_size > 0
 
     def test_load_missing_file_uses_defaults(self):
         config = load_config(Path("/nonexistent/config.toml"))
         assert isinstance(config, AppConfig)
-        assert config.aggregation.bucket_size_usd == 1.0
+        assert config.symbols["BTC-USDT"].bucket_size == 1.0

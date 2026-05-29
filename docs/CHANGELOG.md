@@ -384,3 +384,15 @@ What We Implemented:
 - The chart's Y-axis `priceFormat` and crosshair tooltip now dynamically calculate their decimal precision based directly on the active `tickSize` (e.g., `tickSize = 0.0001` natively formats as 4 decimals).
 - `tickSize` added to the LWC React hook dependency array so the chart instantly hot-swaps precision live when the auto-scaler shifts intervals.
 - Location: `FootprintLwcChart.jsx`.
+
+---
+
+## ✅ Phase 8c Complete - Test Suite Alignment & Detection Refinement
+
+### Backend — Detection Refinement
+* **Absorption price-range check fixed**: Simplified the redundant, mathematically flawed range limit check inside `_detect_absorption` in `app/detection/engine.py`. It now directly filters candles whose total price range exceeds `absorption_price_pct`, ensuring valid absorption zones are captured accurately under high volatility conditions.
+
+### Tests — 100% Passing Test Suite
+* **Config test suite aligned with symbols schema**: Refactored `app/tests/test_config.py` to assert correct symbol-level properties (e.g. `config.symbols["BTC-USDT"].bucket_size` and `config.symbols["BTC-USDT"].min_volume`) in accordance with the multi-symbol schema introduced in Phase 8b.
+* **New absorption test case**: Added `test_absorption_large_range_not_flagged` to `app/tests/test_detection.py` to guarantee proper range filtration under extreme market movements.
+* **Result**: **89/89 unit tests passing successfully** (100% green).
