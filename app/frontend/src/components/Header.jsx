@@ -48,29 +48,14 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
 
       <div className="header-right">
         <div className="controls-row" ref={containerRef}>
-          <div className="control-group">
-            <div
-              className={`auto-fit-badge markets-toggle-btn ${isSidebarOpen ? 'active' : 'inactive'}`}
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              title="Toggle Symbol Hub & Watchlist"
-              style={{
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: 'pointer',
-                background: isSidebarOpen ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.05)',
-                color: isSidebarOpen ? '#00e676' : '#ffffff',
-                border: isSidebarOpen ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                fontSize: '13px',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <span>🏛️</span>
-              <span>MARKETS ({symbol})</span>
-            </div>
+          <div
+            className={`markets-toggle-btn ${isSidebarOpen ? 'active' : 'inactive'}`}
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            title="Toggle Symbol Hub & Watchlist"
+          >
+            <span className="markets-icon">🏛️</span>
+            <span className="markets-label">MARKETS</span>
+            <span className="markets-symbol">({symbol})</span>
           </div>
 
           <div className="custom-dropdown-container">

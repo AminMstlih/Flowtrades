@@ -1712,6 +1712,51 @@ body {
 /* ========================================
    UPGRADED HUD TOGGLES (Header)
    ======================================== */
+/* ========================================
+   UPGRADED MARKETS TOGGLE BUTTON
+   ======================================== */
+
+.markets-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px; /* Uniform height */
+  box-sizing: border-box;
+}
+
+.markets-toggle-btn.active {
+  background: rgba(0, 230, 118, 0.05); /* Soft, low-contrast green glass backplate */
+  border: 1px solid rgba(0, 230, 118, 0.35); /* Elegant, thin active green border */
+  box-shadow: inset 3px 0 0 #00e676, 0 0 10px rgba(0, 230, 118, 0.08); /* Left status bar + subtle active neon glow */
+  color: var(--text-primary); /* White text for premium contrast */
+}
+
+.markets-toggle-btn.active .markets-symbol {
+  color: #00e676; /* Soft green only for active symbol name */
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.markets-toggle-btn.inactive {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.markets-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
 
 .hud-toggle-btn {
   font-family: var(--font-mono);
