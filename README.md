@@ -2,6 +2,10 @@
 
 Real-time BTC order flow visualization across Binance, OKX, and Bybit exchanges.
 
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/fa3eef6c-a4bf-4311-8a4a-0bb7208aec88" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4ad8a6ae-9643-4a04-82b1-c5918cebd33a" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4ff25078-30f8-4dc2-bbfa-b562ee0bbae1" />
+
 ## Quick Start
 
 ### For Development (Hot Reload)
@@ -37,13 +41,6 @@ Exchange APIs → Normalization → Trade Bus → Aggregation → FastAPI Server
                                                     ↕
                                               WebSocket Broadcast
 ```
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/38388502-b8c2-4d85-b1ce-48de5d92f859" />
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/a71ad8bf-3ac0-45ae-8692-8332bbc59f9f" />
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/cc362b3d-ce42-483b-9c17-e2b36942de1a" />
-
-
-
-
 
 # Flowtrades ⚡
 
