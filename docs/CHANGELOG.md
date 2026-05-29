@@ -1,3 +1,32 @@
+# Changelog
+
+## 🛠️ Post-Phase 9 Hotfix - Decimal Precision, Axis Formatting, & Crash Resolution (May 2026)
+
+### Frontend & Charting Core
+* **LWC Crash Guard & Decimal Decoupling**: Decoupled the Lightweight Charts custom series `priceFormat` (precision and `minMove`) entirely from the aggregated footprints `tickSize`. Bound the chart's price scaling configuration to the asset's static natural decimals spec (`1` for BTC, `4` for BEAT, and `2` for HYPE).
+* **Base-10 minMove Enforcement**: Ensured `minMove` passed to LWC is strictly a base-10 subdivision (`0.1`, `0.0001`, `0.01`), mathematically eliminating the internal LWC `unexpected base` coordinate projection assertion crash when trading tokens like `BEAT-USDT-SWAP` or `HYPE-USDT` with non-base-10 ticks (e.g. `0.00015`, `0.0003`, or `0.0008`).
+* **Stale Closure Mitigation**: Introduced `symbolRef` in `FootprintLwcChart.jsx` to ensure the chart's mount-level crosshair subscription always references the fresh active symbol state, preventing stale formatting properties.
+* **Localized Price Formatting & Thousands Grouping**: Integrated the unified `formatPrice` utility across LWC's right-side price scale formatter, hover crosshair marker, and stats tooltip. Large figures (like BTC price and cumulative volume delta) now display with proper US comma grouping (e.g. `74,032.4` and `+162,650.00`) instead of unformatted raw decimals.
+
+---
+
+## ✅ Phase 9 Complete - Cohesive HUD Design & Glassmorphic UI Upgrade
+
+### Frontend — Premium Glassmorphic HUD & Controls
+* **Custom Dropdown Selects**: Replaced native HTML `<select>` elements for `Tick Size` and `Timeframe` with React-driven options panels featuring glassmorphic blur (`blur(12px)`), glow transitions, and a click-outside dismissal handler.
+* **Premium Indicators**: Upgraded `AUTO-FIT` and `BADGES` toggles into high-tech HUD buttons (`.hud-toggle-btn`) with neon left-edge status strips (orange for AUTO-FIT, green for BADGES).
+* **Unified Stats Grid**: Refined the stats row (`Interval`, `Candles`, `Tot`) using high-contrast monospace text (`Inter` tabular-nums).
+
+### Frontend — Delta Pane & Telemetry Loader
+* **Dynamic Neon Delta Bars**: Corrected the horizontal-width growth layout bug in `DeltaPane.jsx`. Delta bars now grow vertically (`height: ${deltaPct}%`, `width: '80%'`), filled with glowing neon gradients (`#00e676` for buy, `#ff1744` for sell), and styled with responsive height transition animations.
+* **Institutional Terminal Telemetry Loader**: Replaced the basic "Waiting for Market Data" splash in `App.jsx` with an institutional terminal overlay displaying real-time telemetry: active Symbol, websocket connection health, exchange feeds count, and standby task state. Powered by linear scan lines and glowing pulsing scanner keyframes.
+
+### Frontend — Chart & POC Highlight Integration
+* **Precision POC Highlight Integration**: Refactored the Point of Control (POC) rendering in `FootprintLwcChart.jsx`. Swapped the outdated, solid yellow-gold box with a sleek cyber-cyan (`#00e5ff`) layout. The POC box matches the exact width of the hollow candle body (`bodyWidth`) and the exact height of the inner volume bars (`barHeight`), floating seamlessly as a precise neon cradle.
+* **LWC Transparent Backplate**: Set LWC chart canvas background to `'transparent'`, allowing the main container's deep space radial gradients to shine through.
+
+---
+
 ✅ Phase 4 Complete - Footprint Canvas Rendering
 
 What We Implemented:

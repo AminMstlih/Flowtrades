@@ -1,8 +1,8 @@
-import { useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { snapTick, getTickStepsForPrice, getRecommendedTick } from '../utils/tickSteps';
 import { binCeilPrice, binFloorPrice, binRoundPrice, unbinPrice } from '../utils/priceBinning';
-import { aggregateCandles } from '../utils/aggregateCandles';
 import { inferInstrument } from '../utils/instrument';
+import MyWorker from '../core/data/aggregation.worker.js?worker';
 
 const CELL_HEIGHT = 24;
 const HEADER_HEIGHT = 32;
@@ -21,10 +21,11 @@ export function useFootprintViewModel({
   userHasPanned,
   setTickSize,
   setTransform,
+  symbol,
 }) {
   const instrument = useMemo(
-    () => inferInstrument({ lastPrice: chartData.last_price }),
-    [chartData.last_price],
+    () => inferInstrument({ symbol, lastPrice: chartData.last_price }),
+    [symbol, chartData.last_price],
   );
 
   const tickOptions = useMemo(
@@ -36,54 +37,61 @@ export function useFootprintViewModel({
     setTickSize(snapTick(Number(rawTick), 'nearest'));
   }, [setTickSize]);
 
-  const { aggCandles, maxVolumeGlobal } = useMemo(() => {
-    return aggregateCandles(orderedCandles, tickSize);
-  }, [orderedCandles, tickSize]);
+  // Persistent Web Worker reference & sequence tracker for race-condition mitigation
+  const workerRef = useRef(null);
+  const lastProcessedSeqId = useRef(0);
 
-  const priceLadder = useMemo(() => {
-    if (!orderedCandles || orderedCandles.length === 0) {
-      return { prices: [], minBin: 0, maxBin: -1 };
-    }
+  // Aggregated data state computed asynchronously in Web Worker
+  const [aggData, setAggData] = useState({
+    aggCandles: [],
+    maxVolumeGlobal: 1,
+    priceLadder: { prices: [], minBin: 0, maxBin: -1 }
+  });
 
-    const uniqueBins = new Set();
-    orderedCandles.forEach((c) => {
-      if (typeof c.high === 'number') uniqueBins.add(binCeilPrice(c.high, tickSize));
-      if (typeof c.low === 'number') uniqueBins.add(binFloorPrice(c.low, tickSize));
-      if (c.buckets) {
-        c.buckets.forEach((b) => {
-          const rawPrice = Number(b.price);
-          if (!Number.isFinite(rawPrice)) return;
-          uniqueBins.add(binFloorPrice(rawPrice, tickSize));
-        });
+  // Setup Web Worker thread on component mount
+  useEffect(() => {
+    const worker = new MyWorker();
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
+      const { seqId, status, aggCandles, maxVolumeGlobal, priceLadder, error } = e.data;
+      if (status === 'error') {
+        console.error('[Worker] High-frequency aggregation failed:', error);
+        return;
       }
+
+      // Enforce strict sequence ID monotonicity (discard stale race responses)
+      if (seqId < lastProcessedSeqId.current) {
+        return;
+      }
+      lastProcessedSeqId.current = seqId;
+
+      setAggData({
+        aggCandles,
+        maxVolumeGlobal,
+        priceLadder
+      });
+    };
+
+    return () => {
+      worker.terminate();
+    };
+  }, []);
+
+  // Stream parameters to the background Web Worker whenever state changes
+  useEffect(() => {
+    if (!workerRef.current || !orderedCandles) return;
+
+    const seqId = Date.now();
+    workerRef.current.postMessage({
+      seqId,
+      candles: orderedCandles,
+      tickSize,
+      lastPrice: chartData.last_price
     });
+  }, [orderedCandles, tickSize, chartData.last_price]);
 
-    if (typeof chartData.last_price === 'number' && chartData.last_price > 0) {
-      uniqueBins.add(binFloorPrice(chartData.last_price, tickSize));
-    }
-
-    if (uniqueBins.size === 0) return { prices: [], minBin: 0, maxBin: -1 };
-
-    const rawMax = Math.max(...Array.from(uniqueBins));
-    const rawMin = Math.min(...Array.from(uniqueBins));
-    const dataRangeBins = Math.max(rawMax - rawMin, 1);
-
-    // Padding is proportional to the actual data range, not a hardcoded 200.
-    // 15% on each side, capped at 30 bins so the ladder never grows absurdly large.
-    const paddingBins = Math.min(30, Math.ceil(dataRangeBins * 0.15));
-    const maxBin = rawMax + paddingBins;
-    const minBin = rawMin - paddingBins;
-
-    const binsCount = maxBin - minBin + 1;
-    if (binsCount <= 0 || binsCount > 10000) return { prices: [], minBin: 0, maxBin: -1 };
-
-    const prices = [];
-    for (let bin = maxBin; bin >= minBin; bin -= 1) {
-      prices.push(unbinPrice(bin, tickSize));
-    }
-
-    return { prices, minBin, maxBin };
-  }, [orderedCandles, chartData.last_price, tickSize]);
+  const { aggCandles, maxVolumeGlobal, priceLadder } = aggData;
 
   const candleRange = useMemo(() => {
     const highs = orderedCandles.map((c) => c.high).filter((v) => typeof v === 'number');
@@ -136,7 +144,11 @@ export function useFootprintViewModel({
     
     if (range <= 0) return;
 
-    const rowsAvailable = Math.max(2, Math.floor((viewportSize.height - HEADER_HEIGHT) / CELL_HEIGHT));
+    // Target a highly detailed, tightly packed 22px average cell height in auto-fit mode.
+    // This scales tick sizes down to provide much more granular price detail (smaller tick values / more cells),
+    // keeping them tightly packed ("lebih rapet") vertically on the screen.
+    const targetCellHeight = 22;
+    const rowsAvailable = Math.max(2, Math.floor((viewportSize.height - HEADER_HEIGHT) / targetCellHeight));
     const rowsForRange = Math.max(1, rowsAvailable - 2);
     const requiredTick = range / rowsForRange;
     const nextTick = snapTick(requiredTick, 'nearest');

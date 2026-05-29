@@ -1,5 +1,7 @@
 import { createChart } from 'lightweight-charts';
 import { useEffect, useMemo, useRef, useCallback } from 'react';
+import { snapTick } from '../utils/tickSteps';
+import { formatPrice } from '../utils/instrument';
 
 function defaultOptions() {
   return {
@@ -54,7 +56,14 @@ function measureRowHeight(buckets, priceToCoordinate) {
   const y0 = priceToCoordinate(buckets[0].price);
   const y1 = priceToCoordinate(buckets[1].price);
   if (y0 === null || y1 === null) return 16;
-  return Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+  return Math.max(6, Math.min(80, Math.abs(y1 - y0)));
+}
+
+function getNaturalDecimals(sym) {
+  if (sym.includes('BTC')) return 1;
+  if (sym.includes('BEAT')) return 4;
+  if (sym.includes('HYPE')) return 2;
+  return 2; // fallback
 }
 
 function makeFootprintPaneView() {
@@ -74,8 +83,9 @@ function makeFootprintPaneView() {
       const laneWidth = Math.max(6, effectiveBarSpacing * 0.9);
 
       // Define zoom levels based on laneWidth (approximate transition points)
+      // Lowered showNumbers threshold to 38px to keep footprints highly readable and informative at wider zoom ranges
       const showFootprint = laneWidth > 20;
-      const showNumbers = laneWidth > 75;
+      const showNumbers = laneWidth > 38;
 
       target.useBitmapCoordinateSpace((scope) => {
         const ctx = scope.context;
@@ -169,7 +179,7 @@ function makeFootprintPaneView() {
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
-              const barHeight = Math.max(2, rowH * 0.55);
+              const barHeight = Math.max(2, rowH * 0.65);
 
               // Cull to viewport price range (not candle OHLC range).
               // This correctly handles: long wicks, cross-exchange buckets outside OHLC,
@@ -197,8 +207,8 @@ function makeFootprintPaneView() {
 
                 const opacity = Math.min((buy + sell) / maxVol, 1);
                 
-                // background cell tint
-                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                // background cell tint (high-fidelity 22% opacity weights)
+                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.22})` : `rgba(239, 83, 80, ${opacity * 0.22})`;
                 
                 if (b.flags) {
                   for (const flag of b.flags) {
@@ -213,9 +223,14 @@ function makeFootprintPaneView() {
                 ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
 
                 if (b.price === pocPrice) {
-                  ctx.strokeStyle = '#FFD700'; // Gold POC
-                  ctx.lineWidth = 1.5;
-                  ctx.strokeRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                  // High-tech cyber-cyan glass backplate + thin precise neon stroke for Point of Control (POC)
+                  // Matches exact width of hollow candle body and exact height of the inner volume bars
+                  ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+                  ctx.fillRect(centerX - bodyWidth / 2, y - barHeight / 2, bodyWidth, barHeight);
+
+                  ctx.strokeStyle = '#00e5ff';
+                  ctx.lineWidth = 1;
+                  ctx.strokeRect(centerX - bodyWidth / 2, y - barHeight / 2, bodyWidth, barHeight);
                 }
 
                 // volume bars
@@ -247,10 +262,10 @@ function makeFootprintPaneView() {
             // Buckets are pre-sorted descending — reuse measureRowHeight, no re-sort.
             const rowH = measureRowHeight(buckets, priceToCoordinate);
 
-            // Protect horizontal boundaries: ensure text doesn't bleed into adjacent candles
+            // Protect horizontal and vertical boundaries: ensure text doesn't bleed into adjacent candles or off the pane margins
             ctx.save();
             ctx.beginPath();
-            ctx.rect(centerX - laneWidth / 2, 0, laneWidth, scope.bitmapSize.height);
+            ctx.rect(centerX - laneWidth / 2, 4, laneWidth, scope.bitmapSize.height - 8);
             ctx.clip();
 
             const visMinPrice4 = viewportMinPrice - rowH;
@@ -263,12 +278,16 @@ function makeFootprintPaneView() {
               const y = priceToCoordinate(price);
               if (y === null) continue;
 
+              // Skip drawing text if it falls outside the visible series area boundaries to prevent bleeding into borders
+              if (y < 8 || y > scope.bitmapSize.height - 8) continue;
+
               const buy = Number(b.buy_vol) || 0;
               const sell = Number(b.sell_vol) || 0;
               if (buy + sell <= 0 || rowH <= 8) continue;
 
-              // Scale font size by both row height AND lane width to prevent overlaps
-              const fontSize = Math.max(7, Math.min(13, rowH * 0.6, laneWidth * 0.14));
+              // Scale font size dynamically by both row height AND lane width to prevent overlaps.
+              // Adjusted horizontal scaling factor to 0.125 to ensure text floats beautifully within the hollow body outlines with comfortable margins.
+              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.5, laneWidth * 0.125));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
@@ -389,7 +408,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, symbol = 'BTC-USDT', onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -421,6 +440,11 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
     candlesRef.current = candles;
   }, [candles]);
 
+  const symbolRef = useRef(symbol);
+  useEffect(() => {
+    symbolRef.current = symbol;
+  }, [symbol]);
+
   const onInteractionRef = useRef(onInteraction);
   const onViewportChangeRef = useRef(onViewportChange);
   const onVisiblePriceRangeChangeRef = useRef(onVisiblePriceRangeChange);
@@ -437,9 +461,9 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: 'solid', color: '#0D1B2A' },
-        textColor: '#E0E7EF',
-        fontSize: 12,
+        background: { type: 'solid', color: 'transparent' },
+        textColor: '#8FA8BE', // Cool gray-blue for scale typography
+        fontSize: 11,
       },
       crosshair: {
         // Normal mode: crosshair follows mouse freely across the full price range.
@@ -448,21 +472,21 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         mode: 0, // CrosshairMode.Normal
         vertLine: {
           width: 1,
-          color: 'rgba(143, 168, 190, 0.4)',
+          color: 'rgba(255, 255, 255, 0.15)',
           style: 2, // dashed
         },
         horzLine: {
           width: 1,
-          color: 'rgba(143, 168, 190, 0.4)',
+          color: 'rgba(255, 255, 255, 0.15)',
           style: 2, // dashed
         },
       },
       grid: {
-        vertLines: { color: 'rgba(30, 52, 72, 0.9)' },
-        horzLines: { color: 'rgba(30, 52, 72, 0.9)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.03)' }, // Dynamic visual grid lines
+        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
       },
       rightPriceScale: {
-        borderColor: 'rgba(30, 52, 72, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         autoScale: true,
         scaleMargins: {
           top: 0.02,
@@ -470,7 +494,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         },
       },
       timeScale: {
-        borderColor: 'rgba(30, 52, 72, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 5,
@@ -482,17 +506,15 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const paneView = makeFootprintPaneView();
     
-    // Calculate required decimals based on tick size (e.g. 0.0001 -> 4 decimals)
-    const tickDecimals = tickSize.toString().includes('.') 
-      ? tickSize.toString().split('.')[1].length 
-      : 0;
+    const naturalDecimals = getNaturalDecimals(symbol);
+    const lwcMinMove = Number(Math.pow(10, -naturalDecimals).toFixed(naturalDecimals));
 
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       priceFormat: {
-        type: 'price',
-        precision: tickDecimals,
-        minMove: tickSize,
+        type: 'custom',
+        formatter: (price) => formatPrice(price, naturalDecimals),
+        minMove: lwcMinMove,
       },
     });
 
@@ -520,15 +542,16 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         return;
       }
 
-      const open  = Number(data.open).toFixed(tickDecimals);
-      const high  = Number(data.high).toFixed(tickDecimals);
-      const low   = Number(data.low).toFixed(tickDecimals);
-      const close = Number(data.close).toFixed(tickDecimals);
+       const naturalDecimals = getNaturalDecimals(symbolRef.current);
+      const open  = formatPrice(data.open, naturalDecimals);
+      const high  = formatPrice(data.high, naturalDecimals);
+      const low   = formatPrice(data.low, naturalDecimals);
+      const close = formatPrice(data.close, naturalDecimals);
 
       // delta = sum of all bucket deltas
       const buckets = data.aggBuckets || [];
       const delta = buckets.reduce((sum, b) => sum + (Number(b.delta) || 0), 0);
-      const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+      const deltaStr = (delta >= 0 ? '+' : '') + formatPrice(delta, 2);
       const deltaColor = delta >= 0 ? '#26A69A' : '#EF5350';
 
       // Format timestamp
@@ -656,18 +679,17 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
   useEffect(() => {
     if (!seriesRef.current || !candles || candles.length === 0) return;
 
-    const tickDecimals = tickSize.toString().includes('.') 
-      ? tickSize.toString().split('.')[1].length 
-      : 0;
+    const naturalDecimals = getNaturalDecimals(symbolRef.current);
+    const lwcMinMove = Number(Math.pow(10, -naturalDecimals).toFixed(naturalDecimals));
 
     // Apply any updated global volume option securely
     seriesRef.current.applyOptions({
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       showBadges: showBadges,
       priceFormat: {
-        type: 'price',
-        precision: tickDecimals,
-        minMove: tickSize,
+        type: 'custom',
+        formatter: (price) => formatPrice(price, naturalDecimals),
+        minMove: lwcMinMove,
       },
     });
 

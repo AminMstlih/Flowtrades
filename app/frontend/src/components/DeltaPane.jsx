@@ -59,7 +59,7 @@ export const DeltaPane = memo(function DeltaPane({ candles, scrollX = 0, scaleX 
                                 <div className="delta-pane-bar-container">
                                     <div
                                         className={`delta-pane-bar ${isBuy ? 'delta-pane-bar-buy' : 'delta-pane-bar-sell'}`}
-                                        style={{ width: `${deltaPct}%` }}
+                                        style={{ height: `${deltaPct}%`, width: '80%' }}
                                     />
                                 </div>
                             )}
