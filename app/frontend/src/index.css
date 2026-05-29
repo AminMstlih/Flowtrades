@@ -1214,58 +1214,9 @@ body {
    ======================================== */
 
 .symbol-sidebar {
-  width: 320px;
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  background: rgba(10, 18, 30, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
-  z-index: 100;
-  flex-shrink: 0;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
-}
-
-.symbol-sidebar.closed {
-  transform: translateX(100%);
-  width: 0;
-  overflow: hidden;
-}
-
-.sidebar-header {
-  padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.header-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-top-row h3 {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 4px;
-  transition: color 0.15s ease;
 }
 
 .close-btn:hover {
@@ -1283,7 +1234,7 @@ body {
   border-radius: 4px;
   padding: 8px 12px;
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1306,7 +1257,7 @@ body {
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 700;
   padding: 6px 0;
@@ -1346,7 +1297,7 @@ body {
   padding: 40px 16px;
   color: var(--text-muted);
   text-align: center;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
 }
 
 .empty-icon {
@@ -1370,7 +1321,7 @@ body {
   align-items: center;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
 }
 
 .symbol-card:hover {
@@ -1508,7 +1459,7 @@ body {
 }
 
 .hud-title {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -1521,7 +1472,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 
@@ -1655,7 +1606,8 @@ body {
 
 .custom-dropdown-container {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
 }
 
 .custom-dropdown-trigger {
@@ -1663,18 +1615,18 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: all 0.15s ease;
-  min-width: 80px;
-  justify-content: space-between;
   user-select: none;
+  height: 26px; /* Match height of hud-toggle-btn perfectly */
+  box-sizing: border-box;
 }
 
 .custom-dropdown-trigger:hover {
@@ -1683,10 +1635,22 @@ body {
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
 }
 
+.custom-dropdown-trigger .dropdown-label {
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.custom-dropdown-trigger .dropdown-value {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 .custom-dropdown-trigger .arrow {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   color: var(--text-secondary);
   transition: transform 0.2s ease;
+  margin-left: 2px;
 }
 
 .custom-dropdown-container.open .custom-dropdown-trigger .arrow {
@@ -1763,6 +1727,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 26px; /* Ensure uniform height across all header controls */
+  box-sizing: border-box;
 }
 
 .hud-toggle-btn.active.autofit {
@@ -1928,4 +1894,83 @@ body {
   color: var(--text-secondary);
 }
 
+/* ========================================
+   SYMBOL SIDEBAR & WATCHLIST HUB
+   ======================================== */
 
+.symbol-sidebar {
+  width: 320px;
+  height: 100%;
+  background: rgba(13, 27, 42, 0.85); /* Matched to main chart backplate #0D1B2A */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  font-family: var(--font-mono) !important; /* Force monospace style */
+}
+
+.symbol-sidebar.closed {
+  transform: translateX(100%);
+  width: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-top-row h3 {
+  font-family: var(--font-mono); /* Monospace Title */
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+
+.close-btn:hover {
+  color: var(--accent-orange);
+}
+
+.search-bar-container {
+  width: 100%;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono); /* Monospace Search */
+  font-size: 0.75rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}

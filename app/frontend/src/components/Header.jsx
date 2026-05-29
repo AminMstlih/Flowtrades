@@ -73,13 +73,13 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
             </div>
           </div>
 
-          <div className="control-group custom-dropdown-container">
-            <label>Tick Size</label>
+          <div className="custom-dropdown-container">
             <div 
               className="custom-dropdown-trigger" 
               onClick={() => { setIsTickOpen(!isTickOpen); setIsTfOpen(false); }}
             >
-              <span>{tickSize}</span>
+              <span className="dropdown-label">TICK</span>
+              <span className="dropdown-value">{tickSize}</span>
               <span className="arrow">▼</span>
             </div>
             {isTickOpen && (
@@ -101,13 +101,13 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
             )}
           </div>
 
-          <div className="control-group custom-dropdown-container">
-            <label>Timeframe</label>
+          <div className="custom-dropdown-container">
             <div 
               className="custom-dropdown-trigger" 
               onClick={() => { setIsTfOpen(!isTfOpen); setIsTickOpen(false); }}
             >
-              <span>{timeframeWindow >= 60 ? `${timeframeWindow / 60}h` : `${timeframeWindow}m`}</span>
+              <span className="dropdown-label">TF</span>
+              <span className="dropdown-value">{timeframeWindow >= 60 ? `${timeframeWindow / 60}h` : `${timeframeWindow}m`}</span>
               <span className="arrow">▼</span>
             </div>
             {isTfOpen && (
