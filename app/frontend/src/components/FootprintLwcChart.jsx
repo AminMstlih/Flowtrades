@@ -83,8 +83,9 @@ function makeFootprintPaneView() {
       const laneWidth = Math.max(6, effectiveBarSpacing * 0.9);
 
       // Define zoom levels based on laneWidth (approximate transition points)
+      // Lowered showNumbers threshold to 38px to keep footprints highly readable and informative at wider zoom ranges
       const showFootprint = laneWidth > 20;
-      const showNumbers = laneWidth > 75;
+      const showNumbers = laneWidth > 38;
 
       target.useBitmapCoordinateSpace((scope) => {
         const ctx = scope.context;
@@ -285,8 +286,8 @@ function makeFootprintPaneView() {
               if (buy + sell <= 0 || rowH <= 8) continue;
 
               // Scale font size by both row height AND lane width to prevent overlaps
-              // Raised maximum font clamp to 20px to support highly readable typography in wide lanes
-              const fontSize = Math.max(7, Math.min(20, rowH * 0.55, laneWidth * 0.16));
+              // Raised maximum font clamp to 20px and optimized scaling factor to 0.18 for premium legibility
+              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.5, laneWidth * 0.18));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
