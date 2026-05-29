@@ -615,7 +615,7 @@ body {
   width: 80%;
   min-height: 2px;
   border-radius: 2px 2px 0 0;
-  transition: width 0.15s ease;
+  transition: height 0.15s ease;
 }
 
 .delta-pane-bar-buy {
@@ -1648,4 +1648,284 @@ body {
     right: 0;
   }
 }
+
+/* ========================================
+   CUSTOM GLASSMORPHIC DROPDOWN SELECTS
+   ======================================== */
+
+.custom-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-dropdown-trigger {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  min-width: 80px;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.custom-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
+}
+
+.custom-dropdown-trigger .arrow {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.custom-dropdown-container.open .custom-dropdown-trigger .arrow {
+  transform: rotate(180deg);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: rgba(13, 27, 42, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  min-width: 110px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.custom-dropdown-menu::-webkit-scrollbar {
+  width: 3px;
+}
+
+.custom-dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+.custom-dropdown-option {
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.custom-dropdown-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.custom-dropdown-option.selected {
+  background: rgba(0, 230, 118, 0.1);
+  color: #00e676;
+}
+
+/* ========================================
+   UPGRADED HUD TOGGLES (Header)
+   ======================================== */
+
+.hud-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-toggle-btn.active.autofit {
+  color: var(--accent-orange);
+  background: rgba(249, 168, 37, 0.1);
+  border: 1px solid rgba(249, 168, 37, 0.35);
+  box-shadow: inset 3px 0 0 var(--accent-orange), 0 0 10px rgba(249, 168, 37, 0.1);
+}
+
+.hud-toggle-btn.active.badges {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  box-shadow: inset 3px 0 0 #00e676, 0 0 10px rgba(0, 230, 118, 0.1);
+}
+
+.hud-toggle-btn.inactive {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hud-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   NEON DELTA PANE UPGRADES
+   ======================================== */
+
+.delta-pane-cell {
+  transition: background 0.2s ease;
+}
+
+.delta-pane-cell:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.delta-pane-bar-buy {
+  background: linear-gradient(to top, #00e676, rgba(0, 230, 118, 0.15)) !important;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+}
+
+.delta-pane-bar-sell {
+  background: linear-gradient(to top, #ff1744, rgba(255, 23, 68, 0.15)) !important;
+  box-shadow: 0 0 8px rgba(255, 23, 68, 0.4);
+}
+
+/* ========================================
+   INSTITUTIONAL TERMINAL TELEMETRY LOADER
+   ======================================== */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 18, 30, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-content {
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  background: rgba(13, 27, 42, 0.8);
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 230, 118, 0.05);
+  border-radius: 8px;
+  padding: 32px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-width: 440px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #00e676, transparent);
+  animation: load-scan 2s infinite linear;
+}
+
+@keyframes load-scan {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+.terminal-spinner {
+  width: 44px;
+  height: 44px;
+  border: 2px solid rgba(0, 230, 118, 0.08);
+  border-top: 2px solid #00e676;
+  border-radius: 50%;
+  animation: spin 0.8s infinite linear;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-title {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0;
+  text-align: center;
+}
+
+.loading-sub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #00e676;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  animation: text-pulse 1.5s infinite ease-in-out;
+  text-align: center;
+}
+
+@keyframes text-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; text-shadow: 0 0 8px rgba(0, 230, 118, 0.4); }
+  100% { opacity: 0.5; }
+}
+
+.telemetry-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.telemetry-row .label {
+  color: var(--text-muted);
+}
+
+.telemetry-row .val {
+  color: var(--text-secondary);
+}
+
 

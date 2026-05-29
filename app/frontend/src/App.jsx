@@ -158,8 +158,28 @@ function App() {
       {chartData.candles.length === 0 && (
         <div className="loading-overlay">
           <div className="loading-content">
-            <div className="loading-title">Waiting for Market Data...</div>
-            <div className="loading-sub">Latching onto live BTC tape.</div>
+            <div className="terminal-spinner"></div>
+            <div className="loading-title">INITIALIZING DATA PIPELINE</div>
+            <div className="loading-sub">Latching onto live trade tape...</div>
+            
+            <div className="telemetry-grid">
+              <div className="telemetry-row">
+                <span className="label">ACTIVE SYMBOL</span>
+                <span className="val" style={{ color: '#00e676', fontWeight: 'bold' }}>{symbol}</span>
+              </div>
+              <div className="telemetry-row">
+                <span className="label">WEBSOCKET BRIDGE</span>
+                <span className="val" style={{ color: '#ffc107', fontWeight: 'bold' }}>CONNECTING</span>
+              </div>
+              <div className="telemetry-row">
+                <span className="label">AGGREGATION TASK</span>
+                <span className="val">STANDBY</span>
+              </div>
+              <div className="telemetry-row">
+                <span className="label">EXCHANGE FEEDS</span>
+                <span className="val">3 ENABLED</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

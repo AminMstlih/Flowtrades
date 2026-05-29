@@ -437,9 +437,9 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: 'solid', color: '#0D1B2A' },
-        textColor: '#E0E7EF',
-        fontSize: 12,
+        background: { type: 'solid', color: 'transparent' },
+        textColor: '#8FA8BE', // Cool gray-blue for scale typography
+        fontSize: 11,
       },
       crosshair: {
         // Normal mode: crosshair follows mouse freely across the full price range.
@@ -448,21 +448,21 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         mode: 0, // CrosshairMode.Normal
         vertLine: {
           width: 1,
-          color: 'rgba(143, 168, 190, 0.4)',
+          color: 'rgba(255, 255, 255, 0.15)',
           style: 2, // dashed
         },
         horzLine: {
           width: 1,
-          color: 'rgba(143, 168, 190, 0.4)',
+          color: 'rgba(255, 255, 255, 0.15)',
           style: 2, // dashed
         },
       },
       grid: {
-        vertLines: { color: 'rgba(30, 52, 72, 0.9)' },
-        horzLines: { color: 'rgba(30, 52, 72, 0.9)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.03)' }, // Dynamic visual grid lines
+        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
       },
       rightPriceScale: {
-        borderColor: 'rgba(30, 52, 72, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         autoScale: true,
         scaleMargins: {
           top: 0.02,
@@ -470,7 +470,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         },
       },
       timeScale: {
-        borderColor: 'rgba(30, 52, 72, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 5,
