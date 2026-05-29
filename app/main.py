@@ -51,14 +51,16 @@ logger = structlog.get_logger("main")
 
 async def aggregation_task(
     bus: TradeBus,
-    state: FootprintState,
+    states: dict[str, FootprintState],
 ) -> None:
     """
     Consume trades from bus → update footprint state.
     State.process_trade() handles eviction + aggregation internally.
     """
     async for trade in bus.subscribe():
-        state.process_trade(trade)
+        state = states.get(trade.symbol)
+        if state:
+            state.process_trade(trade)
 
 
 async def main() -> None:
@@ -82,33 +84,38 @@ async def main() -> None:
 
     logger.info(
         "starting",
-        bucket_size=config.aggregation.bucket_size_usd,
         window=config.aggregation.default_window,
         exchanges=config.exchanges.enabled,
         display_rows=config.display.rows,
         refresh_ms=config.display.refresh_rate_ms,
+        configured_symbols=list(config.symbols.keys()),
     )
 
     # ── Initialize Components ────────────────────────────────
     bus = TradeBus()
 
     window_seconds = config.aggregation.default_window * 60
-    state = FootprintState(
-        bucket_size=config.aggregation.bucket_size_usd,
-        window_seconds=window_seconds,
-        min_volume_btc=config.detection.min_volume_per_bucket_btc,
-        imbalance_threshold_pct=config.detection.imbalance_threshold_pct,
-        min_bucket_weight_pct=config.detection.min_bucket_weight_pct,
-        min_trades_per_bucket=config.detection.min_trades_per_bucket,
-        absorption_vol_percentile=config.detection.absorption_vol_percentile,
-        absorption_price_pct=config.detection.absorption_price_pct,
-    )
+    
+    states: dict[str, FootprintState] = {}
+    for symbol, sym_config in config.symbols.items():
+        states[symbol] = FootprintState(
+            symbol=symbol,
+            bucket_size=sym_config.bucket_size,
+            min_volume=sym_config.min_volume,
+            window_seconds=window_seconds,
+            imbalance_threshold_pct=config.detection.imbalance_threshold_pct,
+            min_bucket_weight_pct=config.detection.min_bucket_weight_pct,
+            min_trades_per_bucket=config.detection.min_trades_per_bucket,
+            absorption_vol_percentile=config.detection.absorption_vol_percentile,
+            absorption_price_pct=config.detection.absorption_price_pct,
+            max_candles=500,
+        )
 
     supervisor = ExchangeSupervisor(config=config, bus=bus)
 
     # Create FastAPI app
     app = create_app(
-        state=state,
+        states=states,
         num_rows=config.display.rows,
         refresh_rate_ms=config.display.refresh_rate_ms,
         enabled_exchanges=config.exchanges.enabled,
@@ -121,7 +128,7 @@ async def main() -> None:
 
     # Aggregation task
     agg_task = asyncio.create_task(
-        aggregation_task(bus, state), name="aggregation"
+        aggregation_task(bus, states), name="aggregation"
     )
 
     # Uvicorn server

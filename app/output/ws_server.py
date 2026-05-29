@@ -27,7 +27,7 @@ logger = structlog.get_logger(__name__)
 
 
 def create_app(
-    state: FootprintState,
+    states: dict[str, FootprintState],
     num_rows: int = 20,
     refresh_rate_ms: int = 500,
     cors_origins: list[str] | None = None,
@@ -55,22 +55,26 @@ def create_app(
 
     @app.get("/health")
     async def health():
-        stats = state.stats
         return {
             "status": "ok",
             "product": "BTC Order Flow Lite",
             "version": "2.0",
-            "total_trades": stats["total_trades_processed"],
-            "active_buckets": stats["active_buckets"],
+            "symbols": list(states.keys()),
             "connected_clients": len(connected_clients),
         }
 
     @app.websocket("/ws/footprint")
-    async def footprint_ws(ws: WebSocket, window: int = 5):
+    async def footprint_ws(ws: WebSocket, symbol: str = "BTC-USDT", window: int = 5):
+        state = states.get(symbol)
+        if not state:
+            await ws.close(code=4000, reason=f"Symbol not supported: {symbol}")
+            return
+            
         await ws.accept()
+            
         connected_clients.append(ws)
         client_id = id(ws)
-        logger.info("ws_client_connected", client_id=client_id, total=len(connected_clients))
+        logger.info("ws_client_connected", client_id=client_id, symbol=symbol, total=len(connected_clients))
 
         # Backpressure: if a single send takes longer than this, client is too slow
         SEND_TIMEOUT_SEC = 2.0

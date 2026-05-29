@@ -89,7 +89,10 @@ class ExchangeSupervisor:
                 continue
 
             client_cls, normalizer = EXCHANGE_REGISTRY[exchange_name]
-            client = client_cls(log_first_n=log_first_n)
+            client = client_cls(
+                internal_symbols=self.config.exchanges.symbols,
+                log_first_n=log_first_n
+            )
             self._clients[exchange_name] = client
 
             callback = self._create_ingestion_callback(exchange_name, normalizer)

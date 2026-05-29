@@ -194,9 +194,17 @@ class FootprintChart:
             )
         elif candle_start > active.start_time_ms:
             self.historical_candles.append(active)
+            
+            # Bridge the gap: initialize the new candle with the previous close
+            # so the chart bodies visually connect, standard in most trading platforms.
+            prev_close = active.close
             active = FootprintCandle(
                 start_time_ms=candle_start,
-                end_time_ms=candle_start + self.interval_ms
+                end_time_ms=candle_start + self.interval_ms,
+                open=prev_close,
+                high=prev_close if prev_close is not None else float("-inf"),
+                low=prev_close if prev_close is not None else float("inf"),
+                close=prev_close
             )
             
         if candle_start < active.start_time_ms:

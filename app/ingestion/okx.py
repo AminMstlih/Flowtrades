@@ -14,6 +14,7 @@ from __future__ import annotations
 import structlog
 
 from .base import BaseExchangeClient
+from constants.symbols import SYMBOL_MAP
 
 logger = structlog.get_logger(__name__)
 
@@ -39,8 +40,9 @@ class OKXClient(BaseExchangeClient):
 
     WS_URL = "wss://ws.okx.com:8443/ws/v5/public"
 
-    def __init__(self, log_first_n: int = 100) -> None:
+    def __init__(self, internal_symbols: list[str], log_first_n: int = 100) -> None:
         super().__init__(exchange_name="okx")
+        self.internal_symbols = internal_symbols
         self._log_first_n = log_first_n
         self._logged_count = 0
 
@@ -49,9 +51,15 @@ class OKXClient(BaseExchangeClient):
         return self.WS_URL
 
     def subscribe_message(self) -> dict | None:
+        args = []
+        for sym in self.internal_symbols:
+            okx_sym = SYMBOL_MAP.get(sym, {}).get("okx")
+            if okx_sym:
+                args.append({"channel": "trades", "instId": okx_sym})
+
         return {
             "op": "subscribe",
-            "args": [{"channel": "trades", "instId": "BTC-USDT-SWAP"}],
+            "args": args,
         }
 
     def parse_message(self, raw: dict | list) -> list[dict]:
@@ -97,9 +105,15 @@ class OKXClient(BaseExchangeClient):
                 )
                 self._logged_count += 1
 
+            okx_symbol = item.get("instId", "")
+            internal_symbol = next(
+                (k for k, v in SYMBOL_MAP.items() if v.get("okx") == okx_symbol), 
+                okx_symbol
+            )
+
             trade_raw = {
                 "exchange": "okx",
-                "symbol": "BTC-PERP-USDT",
+                "symbol": internal_symbol,
                 "price": item["px"],        # str → normalizer converts
                 "volume": item["sz"],        # str → normalizer converts
                 "side": item["side"],        # already "buy" or "sell"

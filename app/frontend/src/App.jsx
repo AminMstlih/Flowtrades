@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useUIStore } from './core/store/uiStore';
 import { useFootprintStore } from './core/store/footprintStore';
 import { Header } from './components/Header';
@@ -19,17 +19,59 @@ const WS_URL_BASE = getWsUrl();
 function App() {
   const {
     tickSize, tickMode, autoFit, timeframeWindow, showBadges, viewportScroll,
-    setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll
+    symbol, availableSymbols,
+    setTickSize, setTickMode, setAutoFit, setTimeframeWindow, setShowBadges, setViewportScroll,
+    setSymbol, setAvailableSymbols
   } = useUIStore();
 
   const { status, chartData, connect, disconnect } = useFootprintStore();
 
-  const wsUrl = `${WS_URL_BASE}?window=${timeframeWindow}`;
+  const wsUrl = `${WS_URL_BASE}?symbol=${symbol}&window=${timeframeWindow}`;
+
+  useEffect(() => {
+    // Fetch available symbols from backend health endpoint
+    const fetchSymbols = async () => {
+      try {
+        const protocol = window.location.protocol;
+        const host = window.location.host;
+        const apiHost = host.includes(':5173') ? host.replace(':5173', ':8000') : host;
+        const res = await fetch(`${protocol}//${apiHost}/health`);
+        const data = await res.json();
+        if (data.symbols && data.symbols.length > 0) {
+          setAvailableSymbols(data.symbols);
+          if (!data.symbols.includes(symbol)) {
+            setSymbol(data.symbols[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch symbols", err);
+      }
+    };
+    fetchSymbols();
+  }, [setAvailableSymbols, setSymbol, symbol]);
 
   useEffect(() => {
     connect(wsUrl);
     return () => disconnect();
   }, [wsUrl, connect, disconnect]);
+
+  const chartAreaRef = useRef(null);
+  const [viewportSize, setViewportSize] = useState({ width: 1000, height: 800 });
+  const [visiblePriceRange, setVisiblePriceRange] = useState(null);
+
+  useEffect(() => {
+    if (!chartAreaRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setViewportSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
+    observer.observe(chartAreaRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   // ViewModel handles aggregation, tick-sizing, and instrument inference
   const vm = useFootprintViewModel({
@@ -37,7 +79,8 @@ function App() {
     tickSize,
     autoFit,
     tickMode,
-    viewportSize: { width: 1000, height: 800 },
+    viewportSize,
+    visiblePriceRange,
     orderedCandles: chartData.candles,
     transform: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
     userHasPanned: false,
@@ -80,16 +123,21 @@ function App() {
         setTimeframeWindow={setTimeframeWindow}
         showBadges={showBadges}
         setShowBadges={setShowBadges}
+        symbol={symbol}
+        availableSymbols={availableSymbols}
+        setSymbol={setSymbol}
       />
 
       <div className="main-viewport-wrapper">
-        <div className="chart-area" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div className="chart-area" ref={chartAreaRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
           <FootprintLwcChart 
             candles={vm.aggCandles} 
             maxVolumeGlobal={vm.maxVolumeGlobal}
             showBadges={showBadges}
             autoFit={autoFit}
+            tickSize={tickSize}
             onViewportChange={setViewportScroll}
+            onVisiblePriceRangeChange={setVisiblePriceRange}
           />
         </div>
       </div>

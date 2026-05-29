@@ -156,6 +156,16 @@ function makeFootprintPaneView() {
             if (buckets.length > 0) {
               const maxVol = Math.max(options.maxVolumeGlobal || 1, 1);
 
+              let pocPrice = null;
+              let pocVol = -1;
+              for (const b of buckets) {
+                const tv = (Number(b.buy_vol) || 0) + (Number(b.sell_vol) || 0);
+                if (tv > pocVol) {
+                  pocVol = tv;
+                  pocPrice = b.price;
+                }
+              }
+
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
@@ -188,8 +198,25 @@ function makeFootprintPaneView() {
                 const opacity = Math.min((buy + sell) / maxVol, 1);
                 
                 // background cell tint
-                ctx.fillStyle = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.12})` : `rgba(239, 83, 80, ${opacity * 0.12})`;
+                
+                if (b.flags) {
+                  for (const flag of b.flags) {
+                    if (flag.type === 'IMB') {
+                       const flagOpacity = Math.min(1, Math.max(0.2, (flag.severity || 5) / 10));
+                       bgColor = flag.direction === 'buy' ? `rgba(38, 166, 154, ${flagOpacity * 0.6})` : `rgba(239, 83, 80, ${flagOpacity * 0.6})`;
+                    }
+                  }
+                }
+                
+                ctx.fillStyle = bgColor;
                 ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+
+                if (b.price === pocPrice) {
+                  ctx.strokeStyle = '#FFD700'; // Gold POC
+                  ctx.lineWidth = 1.5;
+                  ctx.strokeRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                }
 
                 // volume bars
                 if (leftBar > 0) {
@@ -284,8 +311,8 @@ function makeFootprintPaneView() {
               const y = priceToCoordinate(price);
               if (y === null) continue;
 
-              // Draw badges outside the right edge of the candle body
-              let offsetX = centerX + bodyWidth / 2 + 6;
+              // Draw badges inside the right edge of the candle body
+              let currentRight = centerX + bodyWidth / 2 - 2;
               
               for (const flag of b.flags) {
                 // Ensure opacity is visible but reflects confidence (severity 1..10 -> opacity 0.3..1.0)
@@ -301,22 +328,34 @@ function makeFootprintPaneView() {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
                 }
                 
-                ctx.font = `600 9px Inter, sans-serif`;
+                // Scale badge size with the row height, but keep it small
+                const badgeFontSize = Math.max(6, Math.min(9, rowH * 0.4));
+                ctx.font = `600 ${badgeFontSize}px Inter, sans-serif`;
+                
                 const textWidth = ctx.measureText(flag.type).width;
-                const paddingX = 4;
+                const paddingX = 2;
                 const boxWidth = textWidth + paddingX * 2;
-                const boxHeight = 14;
+                const boxHeight = Math.max(10, Math.min(14, rowH * 0.8));
+                
+                const boxLeft = currentRight - boxWidth;
+                
+                // Only draw if we have enough space so it doesn't overlap the center numbers
+                // (centerX + 3 is where the buy numbers start, assume max 30px width for numbers)
+                if (boxLeft < centerX + 25) {
+                    continue; // Skip drawing badge if the column is too narrow
+                }
                 
                 ctx.fillStyle = bgColor;
                 ctx.beginPath();
-                ctx.roundRect(offsetX, y - boxHeight / 2, boxWidth, boxHeight, 3);
+                ctx.roundRect(boxLeft, y - boxHeight / 2, boxWidth, boxHeight, 2);
                 ctx.fill();
                 
                 ctx.fillStyle = '#FFFFFF';
                 ctx.textAlign = 'center';
-                ctx.fillText(flag.type, offsetX + boxWidth / 2, y + 3);
+                // Adjust text Y position based on font size to keep it vertically centered
+                ctx.fillText(flag.type, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
                 
-                offsetX += boxWidth + 4; // Spacing for next badge
+                currentRight -= (boxWidth + 2); // Spacing for next badge
               }
             }
           }
@@ -350,7 +389,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -384,11 +423,13 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
 
   const onInteractionRef = useRef(onInteraction);
   const onViewportChangeRef = useRef(onViewportChange);
+  const onVisiblePriceRangeChangeRef = useRef(onVisiblePriceRangeChange);
 
   useEffect(() => {
     onInteractionRef.current = onInteraction;
     onViewportChangeRef.current = onViewportChange;
-  }, [onInteraction, onViewportChange]);
+    onVisiblePriceRangeChangeRef.current = onVisiblePriceRangeChange;
+  }, [onInteraction, onViewportChange, onVisiblePriceRangeChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -423,6 +464,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       rightPriceScale: {
         borderColor: 'rgba(30, 52, 72, 0.9)',
         autoScale: true,
+        scaleMargins: {
+          top: 0.02,
+          bottom: 0.02,
+        },
       },
       timeScale: {
         borderColor: 'rgba(30, 52, 72, 0.9)',
@@ -436,8 +481,19 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     });
 
     const paneView = makeFootprintPaneView();
+    
+    // Calculate required decimals based on tick size (e.g. 0.0001 -> 4 decimals)
+    const tickDecimals = tickSize.toString().includes('.') 
+      ? tickSize.toString().split('.')[1].length 
+      : 0;
+
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
+      priceFormat: {
+        type: 'price',
+        precision: tickDecimals,
+        minMove: tickSize,
+      },
     });
 
     chartRef.current = chart;
@@ -464,10 +520,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
         return;
       }
 
-      const open  = Number(data.open).toFixed(1);
-      const high  = Number(data.high).toFixed(1);
-      const low   = Number(data.low).toFixed(1);
-      const close = Number(data.close).toFixed(1);
+      const open  = Number(data.open).toFixed(tickDecimals);
+      const high  = Number(data.high).toFixed(tickDecimals);
+      const low   = Number(data.low).toFixed(tickDecimals);
+      const close = Number(data.close).toFixed(tickDecimals);
 
       // delta = sum of all bucket deltas
       const buckets = data.aggBuckets || [];
@@ -519,6 +575,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       }
       
       // Always sync the viewport, even during programmatic fits/initial load
+      // Always sync the viewport, even during programmatic fits/initial load
       if (onViewportChangeRef.current) {
         const logicalRange = chart.timeScale().getVisibleLogicalRange();
         const currentCandles = candlesRef.current;
@@ -557,9 +614,38 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
           }
         }
       }
+      
+      // Actively report the Y-axis range during panning/kinetic scroll so tick sizing can react
+      if (seriesRef.current && onVisiblePriceRangeChangeRef.current && containerRef.current) {
+        const top = seriesRef.current.coordinateToPrice(0);
+        const bottom = seriesRef.current.coordinateToPrice(containerRef.current.clientHeight);
+        if (top !== null && bottom !== null) {
+          onVisiblePriceRangeChangeRef.current({ top, bottom });
+        }
+      }
     });
 
+    const reportVisiblePriceRange = () => {
+      if (seriesRef.current && onVisiblePriceRangeChangeRef.current && containerRef.current) {
+        const top = seriesRef.current.coordinateToPrice(0);
+        const bottom = seriesRef.current.coordinateToPrice(containerRef.current.clientHeight);
+        if (top !== null && bottom !== null) {
+          onVisiblePriceRangeChangeRef.current({ top, bottom });
+        }
+      }
+    };
+
+    containerRef.current.addEventListener('wheel', reportVisiblePriceRange, { passive: true });
+    containerRef.current.addEventListener('pointerup', reportVisiblePriceRange);
+    
+    // Initial report after a short delay to ensure LWC has computed layout
+    setTimeout(reportVisiblePriceRange, 200);
+
     return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('wheel', reportVisiblePriceRange);
+        containerRef.current.removeEventListener('pointerup', reportVisiblePriceRange);
+      }
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -570,10 +656,19 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
   useEffect(() => {
     if (!seriesRef.current || !candles || candles.length === 0) return;
 
+    const tickDecimals = tickSize.toString().includes('.') 
+      ? tickSize.toString().split('.')[1].length 
+      : 0;
+
     // Apply any updated global volume option securely
     seriesRef.current.applyOptions({
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
-      showBadges: showBadges
+      showBadges: showBadges,
+      priceFormat: {
+        type: 'price',
+        precision: tickDecimals,
+        minMove: tickSize,
+      },
     });
 
     const firstCandleTime = mapCandle(candles[0]).time;
@@ -609,7 +704,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
     lastCandleCountRef.current = candles.length;
     lastTickSizeRef.current = maxVolumeGlobal;
     lastShowBadgesRef.current = showBadges;
-  }, [candles, mapCandle, maxVolumeGlobal, showBadges]);
+  }, [candles, mapCandle, maxVolumeGlobal, showBadges, tickSize]);
 
   // Handle explicit Auto-Fit trigger from parent
   useEffect(() => {
@@ -617,7 +712,10 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, o
       isProgrammaticChangeRef.current = true;
       chartRef.current.timeScale().fitContent();
       // Optional: reset vertical scale to auto
-      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+      chartRef.current.priceScale('right').applyOptions({ 
+        autoScale: true,
+        scaleMargins: { top: 0.02, bottom: 0.02 }
+      });
       setTimeout(() => { isProgrammaticChangeRef.current = false; }, 100);
     }
   }, [autoFit]);
