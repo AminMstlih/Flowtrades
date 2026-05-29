@@ -214,12 +214,13 @@ function makeFootprintPaneView() {
 
                 if (b.price === pocPrice) {
                   // High-tech cyber-cyan glass backplate + thin precise neon stroke for Point of Control (POC)
+                  // Matches exact width of hollow candle body and exact height of the inner volume bars
                   ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
-                  ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                  ctx.fillRect(centerX - bodyWidth / 2, y - barHeight / 2, bodyWidth, barHeight);
 
                   ctx.strokeStyle = '#00e5ff';
                   ctx.lineWidth = 1;
-                  ctx.strokeRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                  ctx.strokeRect(centerX - bodyWidth / 2, y - barHeight / 2, bodyWidth, barHeight);
                 }
 
                 // volume bars
