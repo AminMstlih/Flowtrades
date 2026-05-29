@@ -137,6 +137,7 @@ function App() {
             showBadges={showBadges}
             autoFit={autoFit}
             tickSize={tickSize}
+            symbol={symbol}
             onViewportChange={setViewportScroll}
             onVisiblePriceRangeChange={setVisiblePriceRange}
           />

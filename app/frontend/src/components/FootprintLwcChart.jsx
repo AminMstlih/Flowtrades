@@ -398,7 +398,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, symbol = 'BTC-USDT', onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -491,9 +491,20 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const paneView = makeFootprintPaneView();
     
+    // Defensive LWC Crash Guard: Ensure minMove is never larger than the asset price itself
+    // to prevent lightweight-charts internal "unexpected base" scale projection assertion crash.
+    const firstPrice = (candles && candles.length > 0) 
+      ? Number(candles[0].close) || 1 
+      : (symbol.includes('BTC') ? 70000 : 1);
+      
+    let safeMinMove = tickSize;
+    if (safeMinMove >= firstPrice) {
+      safeMinMove = snapTick(firstPrice * 0.0005, 'nearest');
+    }
+
     // Calculate required decimals based on tick size (e.g. 0.0001 -> 4 decimals)
-    const tickDecimals = tickSize.toString().includes('.') 
-      ? tickSize.toString().split('.')[1].length 
+    const tickDecimals = safeMinMove.toString().includes('.') 
+      ? safeMinMove.toString().split('.')[1].length 
       : 0;
 
     const series = chart.addCustomSeries(paneView, {
@@ -501,7 +512,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
       priceFormat: {
         type: 'price',
         precision: tickDecimals,
-        minMove: tickSize,
+        minMove: safeMinMove,
       },
     });
 
