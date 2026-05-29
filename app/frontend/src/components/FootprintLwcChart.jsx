@@ -252,10 +252,10 @@ function makeFootprintPaneView() {
             // Buckets are pre-sorted descending — reuse measureRowHeight, no re-sort.
             const rowH = measureRowHeight(buckets, priceToCoordinate);
 
-            // Protect horizontal boundaries: ensure text doesn't bleed into adjacent candles
+            // Protect horizontal and vertical boundaries: ensure text doesn't bleed into adjacent candles or off the pane margins
             ctx.save();
             ctx.beginPath();
-            ctx.rect(centerX - laneWidth / 2, 0, laneWidth, scope.bitmapSize.height);
+            ctx.rect(centerX - laneWidth / 2, 4, laneWidth, scope.bitmapSize.height - 8);
             ctx.clip();
 
             const visMinPrice4 = viewportMinPrice - rowH;
@@ -267,6 +267,9 @@ function makeFootprintPaneView() {
               const price = b.price;
               const y = priceToCoordinate(price);
               if (y === null) continue;
+
+              // Skip drawing text if it falls outside the visible series area boundaries to prevent bleeding into borders
+              if (y < 8 || y > scope.bitmapSize.height - 8) continue;
 
               const buy = Number(b.buy_vol) || 0;
               const sell = Number(b.sell_vol) || 0;
