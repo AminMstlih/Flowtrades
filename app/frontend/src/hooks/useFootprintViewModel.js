@@ -21,10 +21,11 @@ export function useFootprintViewModel({
   userHasPanned,
   setTickSize,
   setTransform,
+  symbol,
 }) {
   const instrument = useMemo(
-    () => inferInstrument({ lastPrice: chartData.last_price }),
-    [chartData.last_price],
+    () => inferInstrument({ symbol, lastPrice: chartData.last_price }),
+    [symbol, chartData.last_price],
   );
 
   const tickOptions = useMemo(

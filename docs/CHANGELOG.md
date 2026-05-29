@@ -1,5 +1,15 @@
 # Changelog
 
+## 🛠️ Post-Phase 9 Hotfix - Decimal Precision, Axis Formatting, & Crash Resolution (May 2026)
+
+### Frontend & Charting Core
+* **LWC Crash Guard & Decimal Decoupling**: Decoupled the Lightweight Charts custom series `priceFormat` (precision and `minMove`) entirely from the aggregated footprints `tickSize`. Bound the chart's price scaling configuration to the asset's static natural decimals spec (`1` for BTC, `4` for BEAT, and `2` for HYPE).
+* **Base-10 minMove Enforcement**: Ensured `minMove` passed to LWC is strictly a base-10 subdivision (`0.1`, `0.0001`, `0.01`), mathematically eliminating the internal LWC `unexpected base` coordinate projection assertion crash when trading tokens like `BEAT-USDT-SWAP` or `HYPE-USDT` with non-base-10 ticks (e.g. `0.00015`, `0.0003`, or `0.0008`).
+* **Stale Closure Mitigation**: Introduced `symbolRef` in `FootprintLwcChart.jsx` to ensure the chart's mount-level crosshair subscription always references the fresh active symbol state, preventing stale formatting properties.
+* **Localized Price Formatting & Thousands Grouping**: Integrated the unified `formatPrice` utility across LWC's right-side price scale formatter, hover crosshair marker, and stats tooltip. Large figures (like BTC price and cumulative volume delta) now display with proper US comma grouping (e.g. `74,032.4` and `+162,650.00`) instead of unformatted raw decimals.
+
+---
+
 ## ✅ Phase 9 Complete - Cohesive HUD Design & Glassmorphic UI Upgrade
 
 ### Frontend — Premium Glassmorphic HUD & Controls

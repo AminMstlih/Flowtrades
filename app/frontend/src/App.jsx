@@ -87,6 +87,7 @@ function App() {
     userHasPanned: false,
     setTickSize,
     setTransform: () => {},
+    symbol,
   });
 
   // Keyboard shortcuts

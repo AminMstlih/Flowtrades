@@ -1,6 +1,7 @@
 import { createChart } from 'lightweight-charts';
 import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { snapTick } from '../utils/tickSteps';
+import { formatPrice } from '../utils/instrument';
 
 function defaultOptions() {
   return {
@@ -56,6 +57,13 @@ function measureRowHeight(buckets, priceToCoordinate) {
   const y1 = priceToCoordinate(buckets[1].price);
   if (y0 === null || y1 === null) return 16;
   return Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+}
+
+function getNaturalDecimals(sym) {
+  if (sym.includes('BTC')) return 1;
+  if (sym.includes('BEAT')) return 4;
+  if (sym.includes('HYPE')) return 2;
+  return 2; // fallback
 }
 
 function makeFootprintPaneView() {
@@ -430,6 +438,11 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
     candlesRef.current = candles;
   }, [candles]);
 
+  const symbolRef = useRef(symbol);
+  useEffect(() => {
+    symbolRef.current = symbol;
+  }, [symbol]);
+
   const onInteractionRef = useRef(onInteraction);
   const onViewportChangeRef = useRef(onViewportChange);
   const onVisiblePriceRangeChangeRef = useRef(onVisiblePriceRangeChange);
@@ -491,28 +504,15 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const paneView = makeFootprintPaneView();
     
-    // Defensive LWC Crash Guard: Ensure minMove is never larger than the asset price itself
-    // to prevent lightweight-charts internal "unexpected base" scale projection assertion crash.
-    const firstPrice = (candles && candles.length > 0) 
-      ? Number(candles[0].close) || 1 
-      : (symbol.includes('BTC') ? 70000 : 1);
-      
-    let safeMinMove = tickSize;
-    if (safeMinMove >= firstPrice) {
-      safeMinMove = snapTick(firstPrice * 0.0005, 'nearest');
-    }
-
-    // Calculate required decimals based on tick size (e.g. 0.0001 -> 4 decimals)
-    const tickDecimals = safeMinMove.toString().includes('.') 
-      ? safeMinMove.toString().split('.')[1].length 
-      : 0;
+    const naturalDecimals = getNaturalDecimals(symbol);
+    const lwcMinMove = Number(Math.pow(10, -naturalDecimals).toFixed(naturalDecimals));
 
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       priceFormat: {
-        type: 'price',
-        precision: tickDecimals,
-        minMove: safeMinMove,
+        type: 'custom',
+        formatter: (price) => formatPrice(price, naturalDecimals),
+        minMove: lwcMinMove,
       },
     });
 
@@ -540,15 +540,16 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
         return;
       }
 
-      const open  = Number(data.open).toFixed(tickDecimals);
-      const high  = Number(data.high).toFixed(tickDecimals);
-      const low   = Number(data.low).toFixed(tickDecimals);
-      const close = Number(data.close).toFixed(tickDecimals);
+       const naturalDecimals = getNaturalDecimals(symbolRef.current);
+      const open  = formatPrice(data.open, naturalDecimals);
+      const high  = formatPrice(data.high, naturalDecimals);
+      const low   = formatPrice(data.low, naturalDecimals);
+      const close = formatPrice(data.close, naturalDecimals);
 
       // delta = sum of all bucket deltas
       const buckets = data.aggBuckets || [];
       const delta = buckets.reduce((sum, b) => sum + (Number(b.delta) || 0), 0);
-      const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+      const deltaStr = (delta >= 0 ? '+' : '') + formatPrice(delta, 2);
       const deltaColor = delta >= 0 ? '#26A69A' : '#EF5350';
 
       // Format timestamp
@@ -676,26 +677,17 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
   useEffect(() => {
     if (!seriesRef.current || !candles || candles.length === 0) return;
 
-    // Defensive LWC Crash Guard: Ensure minMove is never larger than the asset price itself
-    // to prevent lightweight-charts internal "unexpected base" scale projection assertion crash.
-    const firstPrice = Number(candles[0].close) || 1;
-    let safeMinMove = tickSize;
-    if (safeMinMove >= firstPrice) {
-      safeMinMove = snapTick(firstPrice * 0.0005, 'nearest');
-    }
-
-    const tickDecimals = safeMinMove.toString().includes('.') 
-      ? safeMinMove.toString().split('.')[1].length 
-      : 0;
+    const naturalDecimals = getNaturalDecimals(symbolRef.current);
+    const lwcMinMove = Number(Math.pow(10, -naturalDecimals).toFixed(naturalDecimals));
 
     // Apply any updated global volume option securely
     seriesRef.current.applyOptions({
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       showBadges: showBadges,
       priceFormat: {
-        type: 'price',
-        precision: tickDecimals,
-        minMove: safeMinMove,
+        type: 'custom',
+        formatter: (price) => formatPrice(price, naturalDecimals),
+        minMove: lwcMinMove,
       },
     });
 

@@ -30,6 +30,10 @@ export function inferInstrument({ symbol, lastPrice } = {}) {
     base.priceDecimals = decimalsFromNumber(base.recommendedTick);
     if (/^BTC/i.test(base.symbol)) {
       base.priceDecimals = 1;
+    } else if (/^BEAT/i.test(base.symbol)) {
+      base.priceDecimals = 4;
+    } else if (/^HYPE/i.test(base.symbol)) {
+      base.priceDecimals = 2;
     }
   } else {
     base.recommendedTick = 1;
