@@ -56,7 +56,7 @@ function measureRowHeight(buckets, priceToCoordinate) {
   const y0 = priceToCoordinate(buckets[0].price);
   const y1 = priceToCoordinate(buckets[1].price);
   if (y0 === null || y1 === null) return 16;
-  return Math.max(6, Math.min(32, Math.abs(y1 - y0)));
+  return Math.max(6, Math.min(80, Math.abs(y1 - y0)));
 }
 
 function getNaturalDecimals(sym) {
@@ -285,7 +285,8 @@ function makeFootprintPaneView() {
               if (buy + sell <= 0 || rowH <= 8) continue;
 
               // Scale font size by both row height AND lane width to prevent overlaps
-              const fontSize = Math.max(7, Math.min(13, rowH * 0.6, laneWidth * 0.14));
+              // Raised maximum font clamp to 20px to support highly readable typography in wide lanes
+              const fontSize = Math.max(7, Math.min(20, rowH * 0.55, laneWidth * 0.16));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
