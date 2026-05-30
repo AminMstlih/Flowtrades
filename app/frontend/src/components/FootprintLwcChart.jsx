@@ -179,7 +179,7 @@ function makeFootprintPaneView() {
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
-              const barHeight = Math.max(2, rowH * 0.85);
+              const barHeight = Math.max(2, rowH * 0.96);
 
               // Cull to viewport price range (not candle OHLC range).
               // This correctly handles: long wicks, cross-exchange buckets outside OHLC,
