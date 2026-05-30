@@ -51,11 +51,20 @@ function findVisibleBucketRange(buckets, minPrice, maxPrice) {
  * Buckets are pre-sorted descending, so index 0 and 1 are adjacent price levels.
  * Returns a fallback of 16px if fewer than 2 buckets or coordinates unavailable.
  */
-function measureRowHeight(buckets, priceToCoordinate) {
-  if (buckets.length < 2) return 16;
-  const y0 = priceToCoordinate(buckets[0].price);
-  const y1 = priceToCoordinate(buckets[1].price);
-  if (y0 === null || y1 === null) return 16;
+function measureRowHeight(buckets, priceToCoordinate, tickSize = 1) {
+  if (buckets.length === 0) return 16;
+  const p0 = buckets[0].price;
+  const y0 = priceToCoordinate(p0);
+  // Ensure we round to avoid floating-point representation drift (e.g. 1.1494 - 0.0001 -> 1.1493)
+  const p1 = Number((p0 - tickSize).toFixed(8));
+  const y1 = priceToCoordinate(p1);
+  if (y0 === null || y1 === null) {
+    if (buckets.length < 2) return 16;
+    const fallbackY0 = priceToCoordinate(buckets[0].price);
+    const fallbackY1 = priceToCoordinate(buckets[1].price);
+    if (fallbackY0 === null || fallbackY1 === null) return 16;
+    return Math.max(6, Math.min(80, Math.abs(fallbackY1 - fallbackY0)));
+  }
   return Math.max(6, Math.min(80, Math.abs(y1 - y0)));
 }
 
@@ -178,7 +187,7 @@ function makeFootprintPaneView() {
 
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
-              const rowH = measureRowHeight(buckets, priceToCoordinate);
+              const rowH = measureRowHeight(buckets, priceToCoordinate, options.tickSize);
               const barHeight = Math.max(2, rowH * 0.96);
 
               // Cull to viewport price range (not candle OHLC range).
@@ -262,7 +271,7 @@ function makeFootprintPaneView() {
           if (showFootprint && showNumbers) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
             // Buckets are pre-sorted descending — reuse measureRowHeight, no re-sort.
-            const rowH = measureRowHeight(buckets, priceToCoordinate);
+            const rowH = measureRowHeight(buckets, priceToCoordinate, options.tickSize);
 
             // Protect horizontal and vertical boundaries: ensure text doesn't bleed into adjacent candles or off the pane margins
             ctx.save();
@@ -285,7 +294,7 @@ function makeFootprintPaneView() {
 
               const buy = Number(b.buy_vol) || 0;
               const sell = Number(b.sell_vol) || 0;
-              if (buy + sell <= 0 || rowH <= 8) continue;
+              if (buy + sell <= 0 || rowH < 12) continue;
 
               // Scale font size dynamically by both row height AND lane width to prevent overlaps.
               // Raised vertical limit factor to 0.65 to scale numbers up vertically in sync with the taller 85% row height.
@@ -317,7 +326,7 @@ function makeFootprintPaneView() {
           if (showFootprint && options.showBadges !== false) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
             // Reuse binary search — only iterate buckets in visible price range
-            const rowH = measureRowHeight(buckets, priceToCoordinate);
+            const rowH = measureRowHeight(buckets, priceToCoordinate, options.tickSize);
             const [startIdx, endIdx] = findVisibleBucketRange(
               buckets,
               viewportMinPrice - rowH,
@@ -513,6 +522,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
 
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
+      tickSize: tickSize,
       priceFormat: {
         type: 'custom',
         formatter: (price) => formatPrice(price, naturalDecimals),
@@ -688,6 +698,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
     seriesRef.current.applyOptions({
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       showBadges: showBadges,
+      tickSize: tickSize,
       priceFormat: {
         type: 'custom',
         formatter: (price) => formatPrice(price, naturalDecimals),
