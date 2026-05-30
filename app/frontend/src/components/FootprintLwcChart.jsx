@@ -179,7 +179,7 @@ function makeFootprintPaneView() {
               // Buckets are pre-sorted descending by price from aggregateCandles.
               // measureRowHeight uses the first two adjacent buckets — no sort needed.
               const rowH = measureRowHeight(buckets, priceToCoordinate);
-              const barHeight = Math.max(2, rowH * 0.65);
+              const barHeight = Math.max(2, rowH * 0.85);
 
               // Cull to viewport price range (not candle OHLC range).
               // This correctly handles: long wicks, cross-exchange buckets outside OHLC,
@@ -205,10 +205,9 @@ function makeFootprintPaneView() {
                 const leftBar = Math.min((sell / maxVol) * halfLane, halfLane);
                 const rightBar = Math.min((buy / maxVol) * halfLane, halfLane);
 
-                const opacity = Math.min((buy + sell) / maxVol, 1);
-                
-                // background cell tint (high-fidelity 22% opacity weights)
-                let bgColor = isUp ? `rgba(38, 166, 154, ${opacity * 0.22})` : `rgba(239, 83, 80, ${opacity * 0.22})`;
+                // No default soft background tint for normal cells to ensure maximum contrast and clear wicks.
+                // Background tint is strictly reserved as an active highlight for signal/imbalance cells.
+                let bgColor = null;
                 
                 if (b.flags) {
                   for (const flag of b.flags) {
@@ -219,8 +218,11 @@ function makeFootprintPaneView() {
                   }
                 }
                 
-                ctx.fillStyle = bgColor;
-                ctx.fillRect(centerX - bodyWidth / 2, y - rowH / 2, bodyWidth, rowH);
+                if (bgColor) {
+                  ctx.fillStyle = bgColor;
+                  // Fill height matches barHeight perfectly to align with volume bars and keep separator margins clean
+                  ctx.fillRect(centerX - bodyWidth / 2, y - barHeight / 2, bodyWidth, barHeight);
+                }
 
                 if (b.price === pocPrice) {
                   // High-tech cyber-cyan glass backplate + thin precise neon stroke for Point of Control (POC)
@@ -286,8 +288,8 @@ function makeFootprintPaneView() {
               if (buy + sell <= 0 || rowH <= 8) continue;
 
               // Scale font size dynamically by both row height AND lane width to prevent overlaps.
-              // Adjusted horizontal scaling factor to 0.125 to ensure text floats beautifully within the hollow body outlines with comfortable margins.
-              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.5, laneWidth * 0.125));
+              // Raised vertical limit factor to 0.65 to scale numbers up vertically in sync with the taller 85% row height.
+              const fontSize = Math.max(6.5, Math.min(20, rowH * 0.65, laneWidth * 0.125));
               ctx.font = `500 ${fontSize}px Inter, sans-serif`;
               ctx.fontVariantNumeric = 'tabular-nums';
               
