@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/FLOWTRADES-%E2%9A%A1-00e5ff?style=for-the-badge&labelColor=0D1B2A&color=00e5ff" height="35" />
 </p>
 
-<h1 align="center">⚡ Flowtrades — Institutional Order Flow Terminal</h1>
+<h1 align="center">⚡ Flowtrades — Trades Flow Terminal</h1>
 
 <p align="center">
   <strong>Real-time order flow aggregation, pattern detection, and Canvas footprints at 60 FPS.</strong>
