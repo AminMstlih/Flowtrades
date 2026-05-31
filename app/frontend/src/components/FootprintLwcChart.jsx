@@ -309,14 +309,29 @@ function makeFootprintPaneView() {
               const sellText = String(Math.round(sell));
               const buyText = String(Math.round(buy));
               
+              let sellTextColor = '#FFFFFF';
+              let buyTextColor = '#FFFFFF';
+              
+              if (b.flags) {
+                for (const flag of b.flags) {
+                  if (flag.type === 'IMB' && (flag.severity || 5) > 7) {
+                    if (flag.direction === 'buy') {
+                      buyTextColor = '#ffd700'; // Gold for high-severity buy imbalance
+                    } else if (flag.direction === 'sell') {
+                      sellTextColor = '#EF5350'; // Red/coral for high-severity sell imbalance
+                    }
+                  }
+                }
+              }
+              
               ctx.textAlign = 'right';
               ctx.strokeText(sellText, centerX - 3, y);
-              ctx.fillStyle = '#FFFFFF'; 
+              ctx.fillStyle = sellTextColor; 
               ctx.fillText(sellText, centerX - 3, y);
               
               ctx.textAlign = 'left';
               ctx.strokeText(buyText, centerX + 3, y);
-              ctx.fillStyle = '#FFFFFF';
+              ctx.fillStyle = buyTextColor;
               ctx.fillText(buyText, centerX + 3, y);
             }
             ctx.restore();
@@ -345,14 +360,14 @@ function makeFootprintPaneView() {
               let currentRight = centerX + bodyWidth / 2 - 2;
               
               for (const flag of b.flags) {
+                if (flag.type === 'IMB') continue; // Imbalances are represented purely by cell background highlights (Option 1)
+                
                 // Ensure opacity is visible but reflects confidence (severity 1..10 -> opacity 0.3..1.0)
                 const opacity = Math.min(1, Math.max(0.3, (flag.severity || 5) / 10));
                 
                 let bgColor = `rgba(100, 100, 100, ${opacity})`;
                 
-                if (flag.type === 'IMB') {
-                  bgColor = flag.direction === 'buy' ? `rgba(38, 166, 154, ${opacity})` : `rgba(239, 83, 80, ${opacity})`;
-                } else if (flag.type === 'ABS') {
+                if (flag.type === 'ABS') {
                   bgColor = `rgba(249, 168, 37, ${opacity})`; // Orange
                 } else if (flag.type === 'EXH') {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
