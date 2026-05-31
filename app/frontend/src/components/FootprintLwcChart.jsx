@@ -373,7 +373,7 @@ function makeFootprintPaneView() {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
                 }
 
-                if (!showNumbers) {
+                if (!showFootprint) {
                   // Zoomed out fallback: Draw a high-visibility structural dot at the center of the column
                   ctx.fillStyle = bgColor;
                   ctx.beginPath();
@@ -391,12 +391,20 @@ function makeFootprintPaneView() {
                 const boxWidth = textWidth + paddingX * 2;
                 const boxHeight = Math.max(10, Math.min(14, rowH * 0.8));
                 
-                const boxLeft = currentRight - boxWidth;
-                
-                // Only draw if we have enough space so it doesn't overlap the center numbers
-                // (centerX + 3 is where the buy numbers start, assume max 30px width for numbers)
-                if (boxLeft < centerX + 25) {
-                    continue; // Skip drawing badge if the column is too narrow
+                let boxLeft;
+                if (showNumbers) {
+                  // Numbers are visible: align badge to the right edge to avoid overlapping center numbers
+                  boxLeft = currentRight - boxWidth;
+                  
+                  // Only draw if we have enough space so it doesn't overlap the center numbers
+                  // (centerX + 3 is where the buy numbers start, assume max 30px width for numbers)
+                  if (boxLeft < centerX + 25) {
+                      continue; // Skip drawing badge if the column is too narrow for both numbers and badge
+                  }
+                  currentRight -= (boxWidth + 2); // Spacing for next badge
+                } else {
+                  // Numbers are hidden: draw badge centered in the cell
+                  boxLeft = centerX - boxWidth / 2;
                 }
                 
                 ctx.fillStyle = bgColor;
@@ -408,8 +416,6 @@ function makeFootprintPaneView() {
                 ctx.textAlign = 'center';
                 // Adjust text Y position based on font size to keep it vertically centered
                 ctx.fillText(flag.type, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
-                
-                currentRight -= (boxWidth + 2); // Spacing for next badge
               }
             }
           }
