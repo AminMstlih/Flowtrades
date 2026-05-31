@@ -338,7 +338,7 @@ function makeFootprintPaneView() {
           }
 
           // 5. Badges / Flags (Absorption, Exhaustion, Imbalance)
-          if (showFootprint && options.showBadges !== false) {
+          if (options.showBadges !== false) {
             const buckets = Array.isArray(d.aggBuckets) ? d.aggBuckets : [];
             // Reuse binary search — only iterate buckets in visible price range
             const rowH = measureRowHeight(buckets, priceToCoordinate, options.tickSize);
@@ -371,6 +371,15 @@ function makeFootprintPaneView() {
                   bgColor = `rgba(249, 168, 37, ${opacity})`; // Orange
                 } else if (flag.type === 'EXH') {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
+                }
+
+                if (!showNumbers) {
+                  // Zoomed out fallback: Draw a high-visibility structural dot at the center of the column
+                  ctx.fillStyle = bgColor;
+                  ctx.beginPath();
+                  ctx.arc(centerX, y, Math.max(2.5, Math.min(5, rowH * 0.35)), 0, 2 * Math.PI);
+                  ctx.fill();
+                  continue;
                 }
                 
                 // Scale badge size with the row height, but keep it small
