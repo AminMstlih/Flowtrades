@@ -1,5 +1,22 @@
 # Changelog
 
+## 💎 Post-Phase 9 Hotfix Part 2 — Spacing Calibration, Overlap Fix, & Premium HUD Upgrades (May 2026)
+
+### Frontend — Footprint Spacing & Density Calibration
+* **Dynamic Tick Height Projection**: Refactored `measureRowHeight` in `FootprintLwcChart.jsx` to map the exact price difference of a single unit of `tickSize` (difference between `p0` and `p0 - tickSize`). This mathematically resolves the sparse buckets issue where gaps in trade activity led to artificially inflated row heights, fixing vertical overlaps for low-priced, dense assets like `BEAT-USDT`.
+* **Proportional Gap Optimization**: Raised `barHeight` coverage multiplier from `85%` to `96%` of dynamic `rowH`, shrinking the visual vertical gap between adjacent footprint cells down to a hair-thin `4%` space, establishing a seamless block column design.
+* **Vertical Text Guard**: Implemented an adaptive row height text guard (`rowH < 12`), auto-hiding footprint numbers when the screen height is too compressed, while continuing to draw the distinct volume bars and highlight blocks.
+
+### Frontend — Premium HUD Timers & Badge Optimizations
+* **Header Live Candle Countdown**: Added a client-side clock loop (`1000ms` tick) in `Header.jsx` synchronized to UTC epoch timeframe boundaries. Automatically parses seconds remaining into `MM:SS` (or `HH:MM:SS` for intervals $\geq$ 1h) using tabular-nums monospace overrides.
+* **Header Alert State Pulse**: Integrates a dynamic alert system. If a candle's lifespan reaches $\leq 10$ seconds remaining, the countdown text dynamically switches to glowing neon cyber-orange (`#ff9800`) with an organic breathing animation (`@keyframes timer-pulse`).
+* **Interactive Price Scale Countdown**: Disabled LWC's built-in price line (`priceLineVisible: false`) to construct a fully managed, custom countdown line. Renders a real-time countdown string (e.g. `⏱️ 04:32`) on the canvas right next to LWC's right price scale, colored based on candle direction (neon green `#26A69A` for up, bright red `#EF5350` for down).
+* **IMB Badge Redundancy Clean-up**: Completely eliminated redundant `IMB` text pill badges. Imbalances are now represented purely by cell background highlights, saving horizontal screen space and reducing noise.
+* **High-Severity Numeric Color-Coding**: For imbalances with a severity rating of $> 7$, the monospace bid/ask numbers themselves are dynamically colored—gold (`#ffd700`) for aggressive buy imbalances on the ask, and red (`#EF5350`) for aggressive sell imbalances on the bid.
+* **Zoomed-Out Badge Fallback**: Decoupled the badge loop from `showFootprint` constraints. If a user zooms out horizontally (columns become narrow), the text pill badges are replaced with high-visibility solid structural dots colored in amber (`ABS`) and blue (`EXH`).
+
+---
+
 ## 🛠️ Post-Phase 9 Hotfix - Decimal Precision, Axis Formatting, & Crash Resolution (May 2026)
 
 ### Frontend & Charting Core
