@@ -22,6 +22,37 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const interval = (timeframeWindow || 1) * 60;
+      const candleStart = Math.floor(now / interval) * interval;
+      const candleClose = candleStart + interval;
+      setSecondsRemaining(Math.max(0, candleClose - now));
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [timeframeWindow]);
+
+  const formatCountdown = (sec) => {
+    if (sec >= 3600) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } else {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+  };
+
+  const countdownStr = formatCountdown(secondsRemaining);
+
   // Map status to display values
   const isConnected = status === 'connected';
   const statusText = status === 'connected' ? 'LIVE' :
@@ -44,6 +75,9 @@ export function Header({ state, status, instrument, tickSize, tickOptions = TICK
 
       <div className="header-center">
         <div className="live-price">{fmtPrice}</div>
+        <div className={`candle-countdown ${secondsRemaining <= 10 ? 'alert-pulse' : ''}`}>
+          {countdownStr}
+        </div>
       </div>
 
       <div className="header-right">
