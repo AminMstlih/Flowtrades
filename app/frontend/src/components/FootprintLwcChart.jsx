@@ -425,8 +425,8 @@ function makeFootprintPaneView() {
                 
                 ctx.fillStyle = '#FFFFFF';
                 ctx.textAlign = 'center';
-                // Adjust text Y position based on font size to keep it vertically centered
-                ctx.fillText(label, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
+                // Draw text exactly at y for perfect vertical centering (using global middle textBaseline)
+                ctx.fillText(label, boxLeft + boxWidth / 2, y);
 
                 currentRight -= (boxWidth + 2); // Spacing for next badge
               }

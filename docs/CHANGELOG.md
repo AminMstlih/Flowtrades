@@ -6,6 +6,7 @@
 * **Zoom-Adaptive Badge Rendering**: Linked badge types to `showNumbers` visibility state. When footprint numbers/texts are hidden (`!showNumbers`), the canvas renders high-visibility solid structural fallback dots in the center. When footprint numbers/texts are visible (`showNumbers`), the canvas renders text-based badges (`ABS` / `EXH`).
 * **Dynamic Space-Aware Abbreviation**: Introduced space-aware automatic abbreviation. If a badge's text block would overlap with the center numbers, the badge automatically falls back to single-letter abbreviation (`"ABS"` $\rightarrow$ `"A"`, `"EXH"` $\rightarrow$ `"E"`). If even the abbreviated badge cannot fit within the candle body boundary without colliding with the buy numbers, it is gracefully hidden.
 * **Precise Margin Calculation**: Replaced the rigid `centerX + 25` overlap guard with a dynamic calculation. Measures the exact pixel width of the active buy volume number (`buyTextWidth`) using `ctx.measureText` under the current footprint font, establishing an exact `centerX + 3 + buyTextWidth + 2` horizontal boundary for safe rendering.
+* **Pristine Vertical Alignment**: Removed the manual base vertical font offset `+ (badgeFontSize * 0.35)` which was pushing the badge texts down. Text is now drawn exactly at `y` using canvas's global `textBaseline = 'middle'` setup, achieving pixel-perfect vertical centering inside the pill shape.
 
 ---
 
