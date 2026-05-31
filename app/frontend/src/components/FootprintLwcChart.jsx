@@ -358,6 +358,17 @@ function makeFootprintPaneView() {
 
               // Draw badges inside the right edge of the candle body
               let currentRight = centerX + bodyWidth / 2 - 2;
+
+              // Calculate dynamic minLeft boundary based on buy text width to avoid overlap
+              let minLeft = centerX;
+              if (showNumbers) {
+                const numFontSize = Math.max(6.5, Math.min(20, rowH * 0.65, laneWidth * 0.125));
+                ctx.font = `500 ${numFontSize}px Inter, sans-serif`;
+                const buy = Number(b.buy_vol) || 0;
+                const buyText = String(Math.round(buy));
+                const buyTextWidth = ctx.measureText(buyText).width;
+                minLeft = centerX + 3 + buyTextWidth + 2; // Right edge of buy text + 2px safety padding
+              }
               
               for (const flag of b.flags) {
                 if (flag.type === 'IMB') continue; // Imbalances are represented purely by cell background highlights (Option 1)
@@ -373,8 +384,8 @@ function makeFootprintPaneView() {
                   bgColor = `rgba(21, 101, 192, ${opacity})`; // Blue
                 }
 
-                if (!showFootprint) {
-                  // Zoomed out fallback: Draw a high-visibility structural dot at the center of the column
+                if (!showNumbers) {
+                  // Fallback: when footprint numbers/texts are hidden, render a clean colored structural dot in the center
                   ctx.fillStyle = bgColor;
                   ctx.beginPath();
                   ctx.arc(centerX, y, Math.max(2.5, Math.min(5, rowH * 0.35)), 0, 2 * Math.PI);
@@ -386,26 +397,26 @@ function makeFootprintPaneView() {
                 const badgeFontSize = Math.max(6, Math.min(9, rowH * 0.4));
                 ctx.font = `600 ${badgeFontSize}px Inter, sans-serif`;
                 
-                const textWidth = ctx.measureText(flag.type).width;
-                const paddingX = 2;
-                const boxWidth = textWidth + paddingX * 2;
-                const boxHeight = Math.max(10, Math.min(14, rowH * 0.8));
-                
-                let boxLeft;
-                if (showNumbers) {
-                  // Numbers are visible: align badge to the right edge to avoid overlapping center numbers
+                let label = flag.type;
+                let textWidth = ctx.measureText(label).width;
+                let paddingX = 2;
+                let boxWidth = textWidth + paddingX * 2;
+                let boxLeft = currentRight - boxWidth;
+
+                // Dynamic Abbreviation: if full label overlaps the numbers/center, try first letter abbreviation ("A" / "E")
+                if (boxLeft < minLeft) {
+                  label = flag.type[0];
+                  textWidth = ctx.measureText(label).width;
+                  boxWidth = textWidth + paddingX * 2;
                   boxLeft = currentRight - boxWidth;
-                  
-                  // Only draw if we have enough space so it doesn't overlap the center numbers
-                  // (centerX + 3 is where the buy numbers start, assume max 30px width for numbers)
-                  if (boxLeft < centerX + 25) {
-                      continue; // Skip drawing badge if the column is too narrow for both numbers and badge
-                  }
-                  currentRight -= (boxWidth + 2); // Spacing for next badge
-                } else {
-                  // Numbers are hidden: draw badge centered in the cell
-                  boxLeft = centerX - boxWidth / 2;
                 }
+
+                // Skip drawing to avoid overlapping the numbers if even the single-letter abbreviation does not fit
+                if (boxLeft < minLeft) {
+                  continue;
+                }
+                
+                const boxHeight = Math.max(10, Math.min(14, rowH * 0.8));
                 
                 ctx.fillStyle = bgColor;
                 ctx.beginPath();
@@ -415,7 +426,9 @@ function makeFootprintPaneView() {
                 ctx.fillStyle = '#FFFFFF';
                 ctx.textAlign = 'center';
                 // Adjust text Y position based on font size to keep it vertically centered
-                ctx.fillText(flag.type, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
+                ctx.fillText(label, boxLeft + boxWidth / 2, y + (badgeFontSize * 0.35));
+
+                currentRight -= (boxWidth + 2); // Spacing for next badge
               }
             }
           }

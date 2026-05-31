@@ -1,5 +1,14 @@
 # Changelog
 
+## 💎 Post-Phase 9 Hotfix Part 3 — Footprint Badge Zoom Optimization (May 2026)
+
+### Frontend — Dynamic Space-Aware Badge Rendering
+* **Zoom-Adaptive Badge Rendering**: Linked badge types to `showNumbers` visibility state. When footprint numbers/texts are hidden (`!showNumbers`), the canvas renders high-visibility solid structural fallback dots in the center. When footprint numbers/texts are visible (`showNumbers`), the canvas renders text-based badges (`ABS` / `EXH`).
+* **Dynamic Space-Aware Abbreviation**: Introduced space-aware automatic abbreviation. If a badge's text block would overlap with the center numbers, the badge automatically falls back to single-letter abbreviation (`"ABS"` $\rightarrow$ `"A"`, `"EXH"` $\rightarrow$ `"E"`). If even the abbreviated badge cannot fit within the candle body boundary without colliding with the buy numbers, it is gracefully hidden.
+* **Precise Margin Calculation**: Replaced the rigid `centerX + 25` overlap guard with a dynamic calculation. Measures the exact pixel width of the active buy volume number (`buyTextWidth`) using `ctx.measureText` under the current footprint font, establishing an exact `centerX + 3 + buyTextWidth + 2` horizontal boundary for safe rendering.
+
+---
+
 ## 💎 Post-Phase 9 Hotfix Part 2 — Spacing Calibration, Overlap Fix, & Premium HUD Upgrades (May 2026)
 
 ### Frontend — Footprint Spacing & Density Calibration
