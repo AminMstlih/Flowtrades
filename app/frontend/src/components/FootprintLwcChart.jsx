@@ -419,7 +419,7 @@ function makeFootprintPaneView() {
   };
 }
 
-export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, symbol = 'BTC-USDT', onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
+export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, tickSize = 1, symbol = 'BTC-USDT', timeframeWindow = 1, onInteraction, maxVolumeGlobal, onViewportChange, showBadges = false, onVisiblePriceRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -523,6 +523,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
     const series = chart.addCustomSeries(paneView, {
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       tickSize: tickSize,
+      priceLineVisible: false, // Disable LWC's built-in price line to avoid duplication with custom countdown price line
       priceFormat: {
         type: 'custom',
         formatter: (price) => formatPrice(price, naturalDecimals),
@@ -699,6 +700,7 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
       maxVolumeGlobal: Math.max(maxVolumeGlobal || 1, 1),
       showBadges: showBadges,
       tickSize: tickSize,
+      priceLineVisible: false, // Ensure built-in price line remains disabled
       priceFormat: {
         type: 'custom',
         formatter: (price) => formatPrice(price, naturalDecimals),
@@ -754,6 +756,76 @@ export function FootprintLwcChart({ candles = [], height = 0, autoFit = false, t
       setTimeout(() => { isProgrammaticChangeRef.current = false; }, 100);
     }
   }, [autoFit]);
+
+  const priceLineRef = useRef(null);
+
+  // Sync custom PriceLine with live countdown title at the active symbol's last close price
+  useEffect(() => {
+    const updatePriceLine = () => {
+      if (!seriesRef.current || !candles || candles.length === 0) {
+        if (priceLineRef.current) {
+          try {
+            seriesRef.current.removePriceLine(priceLineRef.current);
+          } catch(e) {}
+          priceLineRef.current = null;
+        }
+        return;
+      }
+
+      const lastCandle = candles[candles.length - 1];
+      const lastPrice = lastCandle.close;
+      if (lastPrice === undefined || lastPrice === null) return;
+
+      const isUp = lastCandle.close >= lastCandle.open;
+
+      // Calculate UTC-aligned countdown
+      const now = Math.floor(Date.now() / 1000);
+      const interval = (timeframeWindow || 1) * 60;
+      const candleStart = Math.floor(now / interval) * interval;
+      const candleClose = candleStart + interval;
+      const sec = Math.max(0, candleClose - now);
+
+      let countdownStr = '';
+      if (sec >= 3600) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        countdownStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      } else {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        countdownStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+
+      const lineOptions = {
+        price: lastPrice,
+        color: isUp ? '#26A69A' : '#EF5350',
+        lineWidth: 1.5,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `⏱️ ${countdownStr}`,
+      };
+
+      if (!priceLineRef.current) {
+        priceLineRef.current = seriesRef.current.createPriceLine(lineOptions);
+      } else {
+        priceLineRef.current.applyOptions(lineOptions);
+      }
+    };
+
+    updatePriceLine();
+    const timer = setInterval(updatePriceLine, 1000);
+
+    return () => {
+      clearInterval(timer);
+      if (priceLineRef.current && seriesRef.current) {
+        try {
+          seriesRef.current.removePriceLine(priceLineRef.current);
+        } catch (e) {}
+        priceLineRef.current = null;
+      }
+    };
+  }, [candles, timeframeWindow]);
 
   return (
     <div

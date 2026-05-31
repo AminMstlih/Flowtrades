@@ -139,6 +139,7 @@ function App() {
             autoFit={autoFit}
             tickSize={tickSize}
             symbol={symbol}
+            timeframeWindow={timeframeWindow}
             onViewportChange={setViewportScroll}
             onVisiblePriceRangeChange={setVisiblePriceRange}
           />
