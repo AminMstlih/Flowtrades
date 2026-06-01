@@ -5,7 +5,7 @@
 <h1 align="center">⚡ Flowtrades — Trades Flow Terminal</h1>
 
 <p align="center">
-  <strong>Real-time order flow aggregation, pattern detection, and Canvas footprints at 60 FPS.</strong>
+  <strong>Real-time parallel order flow aggregation, pattern detection, and Canvas footprints at 60 FPS.</strong>
 </p>
 
 <p align="center">
@@ -38,25 +38,25 @@
 
 ---
 
-A lightweight, real-time BTC order flow visualization tool built for retail traders who are tired of lagging indicators and fake signal providers. Flowtrades pulls live executed trade data from the biggest perpetual futures exchanges and shows you the actual buying and selling pressure at each price level.
+A high-performance, real-time order flow terminal built for retail traders who are tired of lagging indicators. Flowtrades streams raw perp trades directly from the biggest futures exchanges, organizing volume ticks through a dedicated WebWorker background thread to achieve lag-free rendering on a custom TradingView canvas.
 
 ---
 
 ## What This Is
 
-Most retail traders watch RSI. MACD. Moving averages. These are all **derivatives of price** — they always lag behind what's happening. By the time they signal, the move is already done and you're the exit liquidity.
+Most retail traders watch RSI, MACD, or Moving Averages. These are all **derivatives of price** — they always lag. By the time they cross, you are exit liquidity.
 
-Flowtrades shows you the **raw executed trades** — who is buying, who is selling, and at what price levels volume is stacking up. This is what institutional traders see. Now you can too.
+Flowtrades shows you **raw, executed contract data** — who is buying, who is selling, and where orders are clustering in real-time. 
 
 **This is not:**
-- ❌ A signal provider
+- ❌ A signal provider or alert bot
 - ❌ A prediction engine
-- ❌ A "buy here, sell there" tool
+- ❌ A "buy here, sell there" automated cheat
 
 **This is:**
-- ✅ A market transparency layer
-- ✅ A decision-support tool
-- ✅ A thinking framework for reading real price action
+- ✅ A complete market transparency engine
+- ✅ An institutional terminal layout for price discovery
+- ✅ A strict visual record of raw executed market delta
 
 ---
 
@@ -64,94 +64,137 @@ Flowtrades shows you the **raw executed trades** — who is buying, who is selli
 
 | Feature | Status |
 |---------|--------|
-| Live candlestick chart | ✅ Working |
-| Real-time buy / sell volume per price level | ✅ Working |
-| Delta (buy pressure − sell pressure) | ✅ Working |
-| Footprint ladder display (DOM & Canvas) | ✅ Working |
-| OKX + Bybit multi-exchange connectivity | ✅ Working |
-| Imbalance detection & highlighting | ✅ Working |
-| Absorption & exhaustion detection | ✅ Working |
-| User UI toggles (Badges, Rendering) | ✅ Working |
-| Mobile-responsive web dashboard | 📋 Planned |
-
----
-
-## How It Works
-
-```
-Binance / OKX / Bybit WebSocket streams
-        │
-        ▼
-  Trade Normalizer
-  (price · volume · side · timestamp)
-        │
-        ▼
-  Aggregation Engine
-  (buckets by price level → buy vol · sell vol · delta · imbalance%)
-        │
-        ▼
-  Detection Engine
-  (imbalance · absorption · exhaustion patterns)
-        │
-        ▼
-  Web Dashboard (Canvas-based chart + footprint ladder)
-```
-
-No indicators. No derivatives. Only **executed trade data**.
+| Live Candlestick & Footprint Custom Series | ✅ Built |
+| Parallel WebWorker Aggregation Thread | ✅ Built |
+| Real-time Buy/Sell Volume Splits | ✅ Built |
+| Cumulative Monospace Volume Delta | ✅ Built |
+| High-Severity Delta Imbalance Color-Coding | ✅ Built |
+| Absorption wicks (`ABS` / `A`) & Exhaustion limits (`EXH` / `E`) | ✅ Built |
+| Dynamic Space-Aware Badge Abbreviation & Collision Guard | ✅ Built |
+| Real-Time Price Line Countdown Overlay (`MM:SS`) | ✅ Built |
+| Live Connection Health HUD & Starred Symbol Watchlist | ✅ Built |
 
 ---
 
 ## Tech Stack
 
 **Backend**
-- Python + asyncio
-- WebSocket clients (Binance aggTrade stream)
-- FastAPI (WebSocket server to frontend)
+- Python + `asyncio`
+- High-frequency asynchronous exchange WebSocket clients (OKX, Bybit, Binance)
+- FastAPI WebSocket Broadcasting Server
 
 **Frontend**
-- JavaScript / CSS / HTML
-- TradingView Lightweight Charts (Canvas-based, 60fps)
-- Real-time WebSocket feed
+- React 18 + Vite
+- Zustand State Management
+- HTML5 WebWorker Thread (Background data aggregation)
+- TradingView Lightweight Charts (Custom Series Canvas Renderer)
+
+---
+
+## How It Works
+
+```
+Binance / OKX / Bybit WebSockets
+               │
+               ▼
+       Trade Normalizer
+  (price, volume, side, timestamp)
+               │
+               ▼
+     FastAPI WS Broadcast
+               │
+               ▼
+  HTML5 WebWorker Aggregation Thread
+  (price-binning, POC, delta, imbalances)
+               │
+               ▼
+  Glassmorphic Web UI (60 FPS Canvas)
+```
+
+---
+
+## Project Structure
+
+```
+Flowtrades/
+├── app/
+│   ├── frontend/          # React + Vite UI
+│   │   └── src/
+│   │       ├── components/    # Chart components, sidebar panel, countdown overlays
+│   │       ├── hooks/         # ViewModel and async state orchestrators
+│   │       ├── core/          # Global Zustand UI stores & WebWorker scripts
+│   │       └── utils/         # Formatting helpers and tick stepping logic
+│   ├── aggregation/       # Footprint volume-binning & snapping engines
+│   ├── detection/         # Asynchronous imbalance, absorption & exhaustion engines
+│   ├── ingestion/         # Asynchronous exchange WebSocket stream clients
+│   ├── normalization/     # Unified schema and price snaps normalization
+│   ├── output/            # Uvicorn FastAPI WebSocket hub & REST server
+│   ├── dev_runner.py      # Concurrent development process runner
+│   ├── prod_runner.py     # Production asset builder & single-process runner
+│   ├── main.py            # Base terminal orchestrator entrypoint
+│   └── config.toml        # Live exchange feed configuration
+├── docs/                  # System architecture specifications & Decisions Log
+└── README.md
+```
 
 ---
 
 ## Quick Start
 
+### 1. Clone the Repo
 ```bash
-# Clone the repo
 git clone https://github.com/AminMstlih/Flowtrades.git
-cd Flowtrades/btc-orderflow
-
-# Install Python dependencies
+cd Flowtrades
 ```
-cd Flowtrades/btc-orderflow
+
+### 2. Setup Backend (Virtual Env Recommended)
+```bash
+# Create and activate python virtual environment
+python -m venv .venv
+
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install requirements
 pip install -r requirements.txt
 ```
-## Quick Start
 
-### For Development (Hot Reload)
+### 3. Install Frontend Dependencies
 ```bash
-cd btc-orderflow
+cd app/frontend
+npm install
+cd ..
+```
+
+### 4. Run the Terminal
+
+#### For Development (Backend + Frontend Hot-Reload)
+Starts the FastAPI backend and Vite Dev Server concurrently in a single terminal.
+```bash
+# Run from the app/ directory
 python dev_runner.py
 ```
-Access: http://localhost:5173
+* Access the interface at: **`http://localhost:5173`**
 
-### For Production (Single Server) ⭐
+#### For Production (Single Process)
+Compiles frontend assets into static bundles and serves them directly through the FastAPI uvicorn server.
 ```bash
-cd btc-orderflow
+# Run from the app/ directory
 python prod_runner.py
 ```
-Access: http://localhost:8000
+* Access the interface at: **`http://localhost:8000`**
 
-> ⚠️ **Note:** This project is actively being built. Expect rough edges. If something breaks, open an issue.
+---
 
 ### Exchange Configuration
 By default, the application is pre-configured to use **OKX** as the primary data source. This is recommended for users in regions (like Indonesia) where Binance IP restrictions (`HTTP 403`) are common.
 
-> ⚓ **Architecture Note (OHLC Anchoring):** While the footprint ladder aggregates trading volume from ALL enabled exchanges to show full market liquidity, the Candlestick bounds (Open, High, Low, Close) are strictly anchored to the primary exchange (OKX). This prevents cross-exchange price differences (e.g. BTC-USDT-SWAP vs BTCUSDT) from creating visual artifacts or gaps in the candle bodies.
+> ⚓ **Architecture Note (OHLC Anchoring):** While the footprint ladder aggregates trading volume from ALL enabled exchanges to show full market liquidity, the Candlestick bounds (Open, High, Low, Close) are strictly anchored to the primary exchange (OKX). This prevents cross-exchange price differences (e.g. BTC-USDT-SWAP vs BTCUSDT) from creating visual gaps in the wicks.
 
 To edit your exchange sources:
-1. Open `config.toml` in the root directory.
+1. Open `app/config.toml` in the directory.
 2. Locate the `[exchanges]` section.
 3. Update the `enabled` list:
    ```toml
@@ -161,65 +204,16 @@ To edit your exchange sources:
 
 ---
 
-## Project Structure
+## Troubleshooting
 
-```
-Flowtrades/
-├── btc-orderflow/      # Core Python backend
-│   ├── main.py         # Entry point
-│   ├── ingestion/      # WebSocket clients per exchange
-│   ├── normalization/  # Trade data schema + normalizers
-│   ├── aggregation/    # Footprint engine (buy/sell/delta)
-│   └── output/         # Terminal + WebSocket server
-├── docs/               # Architecture & engineering docs
-├── .gitignore
-├── LICENSE             # MIT
-└── README.md
-```
+**Chart shows no data**
+Check your region. Binance blocks certain IPs (Indonesia, etc.).
+Set `enabled = ["okx", "bybit"]` in `app/config.toml` and restart the backend.
 
----
-
-## The Footprint — What You're Looking At
-
-```
-Price     | Buy Vol  | Sell Vol | Delta     | Imbalance
-──────────┼──────────┼──────────┼───────────┼──────────
-67,250    |   42.80  |   12.10  |  +30.70   |  +78%  ▲
-67,249    |   18.40  |   62.30  |  -43.90   |  -77%  ▼  [ABS]
-67,248    |    8.20  |    9.10  |   -0.90   |    --
-67,247    |   91.00  |   22.50  |  +68.50   |  +80%  ▲
-```
-
-**Reading it:**
-- **High imbalance (≥70%)** = one side aggressively dominating that price level
-- **[ABS]** = Absorption detected — high volume, low price movement — a large player may be defending that level
-- **[EXH]** = Exhaustion — volume spike followed by counter-pressure — momentum weakening
-
----
-
-- [x] Binance + OKX + Bybit WebSocket support
-- [x] Real-time candlestick chart
-- [x] Buy/sell volume aggregation per price level
-- [x] Delta calculation
-- [x] Imbalance detection with threshold highlighting
-- [x] Absorption & exhaustion pattern detection
-- [x] Multi-exchange merged view (OKX/Bybit)
-- [x] User-controlled toggle for detection badges
-- [ ] Mobile-responsive web dashboard
-- [ ] Educational tooltips explaining each pattern
-- [ ] Historical replay mode
-
----
-
-## Philosophy
-
-This tool is built against three things:
-
-- **Blind trading** — entering without knowing who is on the other side
-- **Indicator dependency** — using lagging data as if it predicts the future
-- **Fake signal providers** — paying for someone else's guesses
-
-If you use this tool correctly, it won't tell you what to do. It will show you **what is happening**. The decision is still yours — which is exactly how it should be.
+**Websocket connects but frontend shows nothing**
+Make sure you are accessing the correct port.
+- Dev Mode: Access **`http://localhost:5173`** (Vite proxy)
+- Prod Mode: Access **`http://localhost:8000`** (Uvicorn static server)
 
 ---
 
@@ -232,10 +226,3 @@ This is an open build. If you cloned this and have ideas, found bugs, or want to
 ## License
 
 MIT — use it, fork it, build on it.
-
----
-
-<p align="center">
-  Built by a retail trader, for retail traders.<br/>
-  Not financial advice. Never signals. Always raw market data.
-</p>
